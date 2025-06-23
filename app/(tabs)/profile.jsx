@@ -17,7 +17,7 @@ export default function ProfileScreen() {
   const handleLogout = () => {
     if (Platform.OS === 'web') {
       logout();
-      router.replace('/(auth)/login');
+      router.replace('/(auth)/get-started');
     } else {
       Alert.alert(
         'Logout',
@@ -32,7 +32,7 @@ export default function ProfileScreen() {
             style: 'destructive',
             onPress: () => {
               logout();
-              router.replace('/(auth)/login');
+              router.replace('/(auth)/get-started');
             },
           },
         ]
@@ -195,9 +195,9 @@ export default function ProfileScreen() {
       <Button
         title="Logout"
         onPress={handleLogout}
-        variant="outline"
+        variant="danger"
         style={styles.logoutButton}
-        icon={<LogOut size={18} color={colors.primary} />}
+        icon={<LogOut size={18} color="#FFFFFF" />}
       />
 
       {/* Edit Profile Modal */}

@@ -76,11 +76,7 @@ export default function EmergencyScreen() {
   };
 
   const renderEmergencyContact = ({ item }) => (
-    <TouchableOpacity
-      style={styles.contactCard}
-      onPress={() => handleCall(item.number, item.name)}
-      activeOpacity={0.7}
-    >
+    <View style={styles.contactCard}>
       <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
         {item.icon}
       </View>
@@ -90,15 +86,17 @@ export default function EmergencyScreen() {
         <Text style={styles.contactDescription}>{item.description}</Text>
       </View>
       
-      <View style={styles.callContainer}>
+      <TouchableOpacity
+        style={styles.callContainer}
+        onPress={() => handleCall(item.number, item.name)}
+        activeOpacity={0.7}
+      >
         <View style={styles.numberContainer}>
           <Text style={styles.contactNumber}>{item.number}</Text>
         </View>
-        <View style={styles.callButton}>
-          <Phone size={20} color="#FFFFFF" />
-        </View>
-      </View>
-    </TouchableOpacity>
+        <Phone size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -208,23 +206,29 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   callContainer: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 52,
+    height: 52,
+    backgroundColor: colors.success,
+    borderRadius: 26,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   numberContainer: {
-    marginBottom: 8,
+    position: 'absolute',
+    top: -24,
   },
   contactNumber: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.primary,
-  },
-  callButton: {
-    backgroundColor: colors.primary,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
+    color: colors.text,
   },
   disclaimer: {
     padding: 16,

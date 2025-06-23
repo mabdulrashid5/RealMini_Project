@@ -5,6 +5,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import { colors } from "@/constants/colors";
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export const unstable_settings = {
   initialRouteName: "(auth)",
@@ -40,7 +41,7 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -74,6 +75,6 @@ function RootLayoutNav() {
           }} 
         />
       </Stack>
-    </>
+    </GestureHandlerRootView>
   );
 } 
