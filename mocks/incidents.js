@@ -13,6 +13,8 @@ export const mockIncidents = [
     reportedBy: 'user1',
     reportedAt: Date.now() - 1000 * 60 * 15, // 15 minutes ago
     status: 'verified',
+    verifiedBy: 'moderator1',
+    verifiedAt: Date.now() - 1000 * 60 * 10,
     upvotes: 5
   },
   {
@@ -25,7 +27,7 @@ export const mockIncidents = [
       longitude: -0.1964,
       address: 'Liberation Road, Accra'
     },
-    reportedBy: 'user2',
+    reportedBy: 'user1',
     reportedAt: Date.now() - 1000 * 60 * 60, // 1 hour ago
     status: 'pending',
     upvotes: 3

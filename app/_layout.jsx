@@ -74,6 +74,41 @@ function RootLayoutNav() {
             presentation: "modal",
           }} 
         />
+        <Stack.Screen 
+          name="my-reports" 
+          options={{ 
+            title: "My Reports",
+            presentation: "card",
+          }} 
+        />
+        <Stack.Screen 
+          name="settings/notifications" 
+          options={{ 
+            title: "Notifications",
+            presentation: "card",
+          }} 
+        />
+        <Stack.Screen 
+          name="settings/privacy" 
+          options={{ 
+            title: "Privacy & Security",
+            presentation: "card",
+          }} 
+        />
+        <Stack.Screen 
+          name="settings/help" 
+          options={{ 
+            title: "Help & Support",
+            presentation: "card",
+          }} 
+        />
+        <Stack.Screen 
+          name="settings/about" 
+          options={{ 
+            title: "About",
+            presentation: "card",
+          }} 
+        />
       </Stack>
     </GestureHandlerRootView>
   );

@@ -4,12 +4,15 @@ import { useRouter } from 'expo-router';
 import { LogOut, Settings, Shield, Award, HelpCircle, Bell, MapPin, Camera, X, Edit2 } from 'lucide-react-native';
 import { colors } from '@/constants/colors';
 import { useAuthStore } from '@/store/auth-store';
+import { useIncidentsStore } from '@/store/incidents-store';
 import { Button } from '@/components/Button';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout, updateUser } = useAuthStore();
+  const { getUserStats } = useIncidentsStore();
+  const stats = getUserStats();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editedName, setEditedName] = useState(user?.name || 'User');
   const [editedEmail, setEditedEmail] = useState(user?.email || 'user@example.com');
@@ -40,53 +43,61 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleSaveProfile = async () => {
+    if (!editedName.trim()) {
+      Alert.alert('Error', 'Name cannot be empty');
+      return;
+    }
+
+    if (!isValidEmail(editedEmail)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    try {
+      await updateUser({
+        ...user,
+        name: editedName,
+        email: editedEmail,
+      });
+      setIsEditingProfile(false);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update profile');
+    }
+  };
+
   const handleChangeAvatar = async () => {
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Please allow access to your photo library to change your avatar.');
+      if (permissionResult.granted === false) {
+        Alert.alert('Permission Required', 'Permission to access camera roll is required!');
         return;
       }
-
+      
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.5,
+        quality: 0.8,
       });
-
-      if (!result.canceled && result.assets[0].uri && user) {
-        // Update user avatar in the store
-        updateUser({
+      
+      if (!result.canceled) {
+        await updateUser({
           ...user,
-          avatar: result.assets[0].uri
+          avatar: result.assets[0].uri,
         });
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to update avatar. Please try again.');
+      Alert.alert('Error', 'Failed to update profile picture');
     }
   };
 
-  const handleSaveProfile = () => {
-    if (!user) return;
-    
-    // Validate email format
+  const isValidEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(editedEmail)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
-      return;
-    }
-
-    // Update user info in the store
-    updateUser({
-      ...user,
-      name: editedName,
-      email: editedEmail,
-    });
-    setIsEditingProfile(false);
+    return emailRegex.test(email);
   };
-  
+
   const menuItems = [
     {
       icon: <MapPin size={20} color={colors.text} />,
@@ -98,7 +109,7 @@ export default function ProfileScreen() {
       icon: <Bell size={20} color={colors.text} />,
       title: 'Notification Settings',
       subtitle: 'Manage your notification preferences',
-      onPress: () => router.push('/modal'),
+      onPress: () => router.push('/settings/notifications'),
     },
     {
       icon: <Settings size={20} color={colors.text} />,
@@ -110,19 +121,19 @@ export default function ProfileScreen() {
       icon: <Shield size={20} color={colors.text} />,
       title: 'Privacy & Security',
       subtitle: 'Manage your privacy settings',
-      onPress: () => router.push('/modal'),
+      onPress: () => router.push('/settings/privacy'),
     },
     {
       icon: <HelpCircle size={20} color={colors.text} />,
       title: 'Help & Support',
       subtitle: 'Get help with using the app',
-      onPress: () => router.push('/modal'),
+      onPress: () => router.push('/settings/help'),
     },
     {
       icon: <Award size={20} color={colors.text} />,
       title: 'About',
       subtitle: 'Learn more about Road Safety Reporter',
-      onPress: () => router.push('/modal'),
+      onPress: () => router.push('/settings/about'),
     },
   ];
   
@@ -155,21 +166,21 @@ export default function ProfileScreen() {
         
         <View style={styles.stats}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>12</Text>
+            <Text style={styles.statValue}>{stats.totalReports}</Text>
             <Text style={styles.statLabel}>Reports</Text>
           </View>
           
           <View style={styles.statDivider} />
           
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>8</Text>
+            <Text style={styles.statValue}>{stats.verifiedReports}</Text>
             <Text style={styles.statLabel}>Verified</Text>
           </View>
           
           <View style={styles.statDivider} />
           
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>45</Text>
+            <Text style={styles.statValue}>{stats.totalUpvotes}</Text>
             <Text style={styles.statLabel}>Upvotes</Text>
           </View>
         </View>
