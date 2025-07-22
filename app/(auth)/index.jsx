@@ -91,90 +91,73 @@ export default function AuthScreen() {
         </View>
 
         {/* Auth Card */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.cardContainer}
-        >
-          <View style={styles.card}>
-            <ScrollView 
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.scrollContent}
-            >
-              {/* Tab Switcher */}
-              <View style={styles.tabContainer}>
-                <TabButton 
-                  title="Log In" 
-                  isActive={activeTab === 'login'} 
-                  onPress={() => setActiveTab('login')}
-                />
-                <TabButton 
-                  title="Sign Up" 
-                  isActive={activeTab === 'signup'} 
-                  onPress={() => setActiveTab('signup')}
-                />
-              </View>
-
-              {/* Error Message */}
-              {error && (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              )}
-
-              {/* Form Fields */}
-              <View style={styles.form}>
-                {activeTab === 'signup' && (
-                  <Input
-                    label="Full Name"
-                    placeholder="Enter your full name"
-                    value={fullName}
-                    onChangeText={setFullName}
-                    leftIcon={<User size={20} color={colors.textSecondary} />}
-                    containerStyle={styles.input}
+        <View style={styles.cardWrapper}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.cardContainer}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+          >
+            <View style={styles.card}>
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* Tab Switcher */}
+                <View style={styles.tabContainer}>
+                  <TabButton 
+                    title="Log In" 
+                    isActive={activeTab === 'login'} 
+                    onPress={() => setActiveTab('login')}
                   />
+                  <TabButton 
+                    title="Sign Up" 
+                    isActive={activeTab === 'signup'} 
+                    onPress={() => setActiveTab('signup')}
+                  />
+                </View>
+
+                {/* Error Message */}
+                {error && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                  </View>
                 )}
 
-                <Input
-                  label="Email"
-                  placeholder="Enter your email"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={email}
-                  onChangeText={setEmail}
-                  leftIcon={<Mail size={20} color={colors.textSecondary} />}
-                  containerStyle={styles.input}
-                />
-                
-                <Input
-                  label="Password"
-                  placeholder="Enter your password"
-                  secureTextEntry={!showPassword}
-                  value={password}
-                  onChangeText={setPassword}
-                  leftIcon={<Lock size={20} color={colors.textSecondary} />}
-                  rightIcon={
-                    <TouchableOpacity onPress={togglePasswordVisibility}>
-                      {showPassword ? (
-                        <EyeOff size={20} color={colors.textSecondary} />
-                      ) : (
-                        <Eye size={20} color={colors.textSecondary} />
-                      )}
-                    </TouchableOpacity>
-                  }
-                  containerStyle={styles.input}
-                />
+                {/* Form Fields */}
+                <View style={styles.form}>
+                  {activeTab === 'signup' && (
+                    <Input
+                      label="Full Name"
+                      placeholder="Enter your full name"
+                      value={fullName}
+                      onChangeText={setFullName}
+                      leftIcon={<User size={20} color={colors.textSecondary} />}
+                      containerStyle={styles.input}
+                    />
+                  )}
 
-                {activeTab === 'signup' && (
                   <Input
-                    label="Confirm Password"
-                    placeholder="Confirm your password"
-                    secureTextEntry={!showConfirmPassword}
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
+                    label="Email"
+                    placeholder="Enter your email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={email}
+                    onChangeText={setEmail}
+                    leftIcon={<Mail size={20} color={colors.textSecondary} />}
+                    containerStyle={styles.input}
+                  />
+                  
+                  <Input
+                    label="Password"
+                    placeholder="Enter your password"
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={setPassword}
                     leftIcon={<Lock size={20} color={colors.textSecondary} />}
                     rightIcon={
-                      <TouchableOpacity onPress={toggleConfirmPasswordVisibility}>
-                        {showConfirmPassword ? (
+                      <TouchableOpacity onPress={togglePasswordVisibility}>
+                        {showPassword ? (
                           <EyeOff size={20} color={colors.textSecondary} />
                         ) : (
                           <Eye size={20} color={colors.textSecondary} />
@@ -183,53 +166,74 @@ export default function AuthScreen() {
                     }
                     containerStyle={styles.input}
                   />
-                )}
 
-                {/* Remember Me & Forgot Password */}
-                {activeTab === 'login' && (
-                  <View style={styles.loginOptions}>
-                    <TouchableOpacity 
-                      style={styles.checkbox} 
-                      onPress={() => setRememberMe(!rememberMe)}
-                    >
-                      <View style={[styles.checkboxBox, rememberMe && styles.checkboxChecked]}>
-                        {rememberMe && <FontAwesome name="check" size={12} color="#FFF" />}
-                      </View>
-                      <Text style={styles.checkboxLabel}>Remember me</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity onPress={() => router.push('/forgot-password')}>
-                      <Text style={styles.forgotPassword}>Forgot Password?</Text>
-                    </TouchableOpacity>
+                  {activeTab === 'signup' && (
+                    <Input
+                      label="Confirm Password"
+                      placeholder="Confirm your password"
+                      secureTextEntry={!showConfirmPassword}
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      leftIcon={<Lock size={20} color={colors.textSecondary} />}
+                      rightIcon={
+                        <TouchableOpacity onPress={toggleConfirmPasswordVisibility}>
+                          {showConfirmPassword ? (
+                            <EyeOff size={20} color={colors.textSecondary} />
+                          ) : (
+                            <Eye size={20} color={colors.textSecondary} />
+                          )}
+                        </TouchableOpacity>
+                      }
+                      containerStyle={styles.input}
+                    />
+                  )}
+
+                  {/* Remember Me & Forgot Password */}
+                  {activeTab === 'login' && (
+                    <View style={styles.loginOptions}>
+                      <TouchableOpacity 
+                        style={styles.checkbox} 
+                        onPress={() => setRememberMe(!rememberMe)}
+                      >
+                        <View style={[styles.checkboxBox, rememberMe && styles.checkboxChecked]}>
+                          {rememberMe && <FontAwesome name="check" size={12} color="#FFF" />}
+                        </View>
+                        <Text style={styles.checkboxLabel}>Remember me</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity onPress={() => router.push('/forgot-password')}>
+                        <Text style={styles.forgotPassword}>Forgot Password?</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Submit Button */}
+                  <Button
+                    title={activeTab === 'login' ? "Log In" : "Sign Up"}
+                    onPress={handleSubmit}
+                    variant="primary"
+                    size="large"
+                    loading={isLoading}
+                    style={styles.submitButton}
+                  />
+
+                  {/* Social Login */}
+                  <View style={styles.divider}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>Or</Text>
+                    <View style={styles.dividerLine} />
                   </View>
-                )}
 
-                {/* Submit Button */}
-                <Button
-                  title={activeTab === 'login' ? "Log In" : "Sign Up"}
-                  onPress={handleSubmit}
-                  variant="primary"
-                  size="large"
-                  loading={isLoading}
-                  style={styles.submitButton}
-                />
-
-                {/* Social Login */}
-                <View style={styles.divider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>Or</Text>
-                  <View style={styles.dividerLine} />
+                  <SocialButton
+                    icon={GoogleIcon}
+                    title="Continue with Google"
+                    onPress={() => {}}
+                  />
                 </View>
-
-                <SocialButton
-                  icon={GoogleIcon}
-                  title="Continue with Google"
-                  onPress={() => {}}
-                />
-              </View>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </LinearGradient>
     </View>
   );
@@ -238,7 +242,7 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.gradient.start,
+    backgroundColor: '#FFFFFF',
   },
   gradient: {
     flex: 1,
@@ -259,14 +263,20 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     lineHeight: 24,
   },
+  cardWrapper: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
   cardContainer: {
     flex: 1,
   },
   card: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    flex: 1,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,

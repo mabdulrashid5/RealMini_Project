@@ -24,6 +24,7 @@ export default function ForgotPasswordScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const { resetPassword } = useAuthStore();
 
   const handleResetPassword = async () => {
     setIsLoading(true);
@@ -40,9 +41,7 @@ export default function ForgotPasswordScreen() {
         throw new Error('Please enter a valid email address');
       }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      await resetPassword(email);
       setSuccess(true);
     } catch (err) {
       setError(err.message);
@@ -68,70 +67,74 @@ export default function ForgotPasswordScreen() {
         </View>
 
         {/* Form Card */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.cardContainer}
-        >
-          <View style={styles.card}>
-            <ScrollView 
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.scrollContent}
-            >
-              {error && (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              )}
+        <View style={styles.cardWrapper}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.cardContainer}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+          >
+            <View style={styles.card}>
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                {error && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                  </View>
+                )}
 
-              {success ? (
-                <View style={styles.successContainer}>
-                  <Text style={styles.successTitle}>Check your email</Text>
-                  <Text style={styles.successText}>
-                    We have sent password reset instructions to your email address.
-                    Please check your inbox and follow the instructions.
-                  </Text>
-                  <Button
-                    title="Back to Login"
-                    onPress={() => router.back()}
-                    variant="primary"
-                    size="large"
-                    style={styles.button}
-                  />
-                </View>
-              ) : (
-                <View style={styles.form}>
-                  <Input
-                    label="Email"
-                    placeholder="Enter your email address"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    value={email}
-                    onChangeText={setEmail}
-                    leftIcon={<Mail size={20} color={colors.textSecondary} />}
-                    containerStyle={styles.input}
-                  />
+                {success ? (
+                  <View style={styles.successContainer}>
+                    <Text style={styles.successTitle}>Check your email</Text>
+                    <Text style={styles.successText}>
+                      We have sent password reset instructions to your email address.
+                      Please check your inbox and spam folder, then follow the instructions.
+                    </Text>
+                    <Button
+                      title="Back to Login"
+                      onPress={() => router.back()}
+                      variant="primary"
+                      size="large"
+                      style={styles.button}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.form}>
+                    <Input
+                      label="Email"
+                      placeholder="Enter your email address"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      value={email}
+                      onChangeText={setEmail}
+                      leftIcon={<Mail size={20} color={colors.textSecondary} />}
+                      containerStyle={styles.input}
+                    />
 
-                  <Button
-                    title="Send Reset Instructions"
-                    onPress={handleResetPassword}
-                    variant="primary"
-                    size="large"
-                    loading={isLoading}
-                    style={styles.button}
-                  />
+                    <Button
+                      title="Send Reset Instructions"
+                      onPress={handleResetPassword}
+                      variant="primary"
+                      size="large"
+                      loading={isLoading}
+                      style={styles.button}
+                    />
 
-                  <Button
-                    title="Back to Login"
-                    onPress={() => router.back()}
-                    variant="secondary"
-                    size="large"
-                    style={[styles.button, styles.backButton]}
-                  />
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+                    <Button
+                      title="Back to Login"
+                      onPress={() => router.back()}
+                      variant="secondary"
+                      size="large"
+                      style={[styles.button, styles.backButton]}
+                    />
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </LinearGradient>
     </View>
   );
@@ -140,7 +143,7 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.gradient.start,
+    backgroundColor: '#FFFFFF',
   },
   gradient: {
     flex: 1,
@@ -161,14 +164,20 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     lineHeight: 24,
   },
+  cardWrapper: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
   cardContainer: {
     flex: 1,
   },
   card: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    flex: 1,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -180,7 +189,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
-    paddingBottom: 48,
+    paddingBottom: Platform.OS === 'ios' ? 48 : 24,
   },
   form: {
     marginTop: 8,
