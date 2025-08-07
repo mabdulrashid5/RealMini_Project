@@ -87,12 +87,12 @@ export default function MyReportsScreen() {
         }}
       />
 
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.filtersContainer}
-        contentContainerStyle={styles.filters}
-      >
+      <View style={styles.filtersContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filters}
+        >
         {filters.map((filter) => (
           <TouchableOpacity
             key={filter.id}
@@ -113,6 +113,7 @@ export default function MyReportsScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+      </View>
 
       <ScrollView style={styles.reportsList}>
         {filteredReports.map((report) => (
@@ -172,16 +173,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: '#fff',
+    height: 52,
+    justifyContent: 'center',
   },
   filters: {
-    padding: 16,
+    padding: 12,
+    paddingBottom: 8,
   },
   filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 20,
     backgroundColor: colors.card,
     marginRight: 8,
+    height: 32,
+    justifyContent: 'center',
   },
   filterButtonActive: {
     backgroundColor: colors.primary,

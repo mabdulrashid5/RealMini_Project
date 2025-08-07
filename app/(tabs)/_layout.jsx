@@ -21,6 +21,10 @@ export default function TabLayout() {
             tabBarActiveTintColor: colors.primary,
             tabBarInactiveTintColor: colors.textSecondary,
             tabBarStyle: {
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
               borderTopWidth: 1,
               borderTopColor: colors.border,
               height: 75,
@@ -35,7 +39,6 @@ export default function TabLayout() {
               shadowOpacity: 0.1,
               shadowRadius: 3,
               elevation: 8,
-              marginBottom: 0,
             },
           tabBarLabelStyle: {
             fontSize: 12,
