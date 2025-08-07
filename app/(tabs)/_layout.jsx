@@ -14,17 +14,29 @@ export default function TabLayout() {
   };
   
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "bottom"]}>
-      <Tabs
-        screenOptions={{
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.textSecondary,
-          tabBarStyle: {
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            height: 60,
-            paddingBottom: 8,
-          },
+    <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <Tabs
+          screenOptions={{
+            tabBarActiveTintColor: colors.primary,
+            tabBarInactiveTintColor: colors.textSecondary,
+            tabBarStyle: {
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              height: 75,
+              paddingTop: -2,
+              paddingBottom: 12,
+              backgroundColor: colors.background,
+              shadowColor: '#000',
+              shadowOffset: {
+                width: 0,
+                height: -2,
+              },
+              shadowOpacity: 0.1,
+              shadowRadius: 3,
+              elevation: 8,
+              marginBottom: 0,
+            },
           tabBarLabelStyle: {
             fontSize: 12,
             fontWeight: '500',
@@ -93,13 +105,22 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   reportButton: {
-    top: -20,
+    top: -25,
     justifyContent: 'center',
     alignItems: 'center',
   },
