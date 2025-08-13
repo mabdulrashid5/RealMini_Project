@@ -2,10 +2,11 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { colors } from "@/constants/colors";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import CustomSplashScreen from '@/components/CustomSplashScreen';
 
 export const unstable_settings = {
   initialRouteName: "(auth)",
@@ -18,6 +19,7 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({
     ...FontAwesome.font,
   });
+  const [isCustomSplashVisible, setIsCustomSplashVisible] = useState(true);
 
   useEffect(() => {
     if (error) {
@@ -34,6 +36,10 @@ export default function RootLayout() {
 
   if (!loaded) {
     return null;
+  }
+
+  if (isCustomSplashVisible) {
+    return <CustomSplashScreen onComplete={() => setIsCustomSplashVisible(false)} />;
   }
 
   return <RootLayoutNav />;

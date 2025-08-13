@@ -1,17 +1,15 @@
 {
   "expo": {
-    "name": "Road Safety Reporter App",
-    "slug": "road-safety-reporter-app",
+    "name": "ROAD WATCH",
+    "slug": "road-watch",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "roadwatch",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#1E88E5"
     },
     "ios": {
       "supportsTablet": true,

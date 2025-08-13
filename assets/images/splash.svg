@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="2048" height="2048" viewBox="0 0 2048 2048" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="2048" height="2048" fill="#1E88E5"/>
+  
+  <!-- Logo centered in splash -->
+  <g transform="translate(512, 512)">
+    <!-- Road Path -->
+    <path d="M256 312C256 312 384 412 512 412C640 412 768 312 768 312" stroke="white" stroke-width="48" stroke-linecap="round"/>
+    <path d="M256 512C256 512 384 612 512 612C640 612 768 512 768 512" stroke="white" stroke-width="48" stroke-linecap="round"/>
+    <path d="M256 712C256 712 384 812 512 812C640 812 768 712 768 712" stroke="white" stroke-width="48" stroke-linecap="round"/>
+    
+    <!-- Eye Symbol -->
+    <circle cx="512" cy="512" r="120" stroke="white" stroke-width="48"/>
+    <circle cx="512" cy="512" r="40" fill="white"/>
+    
+    <!-- Alert Indicators -->
+    <path d="M512 212L562 312H462L512 212Z" fill="#FFD54F"/>
+    <circle cx="812" cy="512" r="40" fill="#FFD54F"/>
+    <circle cx="212" cy="512" r="40" fill="#FFD54F"/>
+  </g>
+  
+  <!-- App Name -->
+  <text x="1024" y="1500" text-anchor="middle" font-family="Arial-Bold, Arial" font-weight="bold" font-size="120" fill="white">ROAD WATCH</text>
+  <text x="1024" y="1600" text-anchor="middle" font-family="Arial, Arial" font-size="60" fill="rgba(255, 255, 255, 0.8)">Your Safety Companion</text>
+</svg>
