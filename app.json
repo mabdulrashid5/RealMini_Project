@@ -15,14 +15,22 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.rork.road-safety-reporter-app"
+      "bundleIdentifier": "app.rork.road-safety-reporter-app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyD6f4kc1k-aa0s1ndZWNpXiGkjj2CU_qgE"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.road-safety-reporter-app"
+      "package": "app.rork.road-safety-reporter-app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyD6f4kc1k-aa0s1ndZWNpXiGkjj2CU_qgE"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
