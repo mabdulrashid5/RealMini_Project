@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { mockAlerts } from '@/mocks/alerts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '@/utils/config';
 
 const ALERTS_STORAGE_KEY = '@alerts';
 
@@ -21,29 +21,34 @@ export const useAlertsStore = create((set, get) => ({
         set({ alerts, lastSynced: timestamp });
       }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 600));
+      // Real API call
+      const { token } = require('./auth-store').useAuthStore.getState();
       
-      // Add additional fields to mock alerts
-      const enhancedAlerts = mockAlerts.map(alert => ({
-        ...alert,
-        type: alert.type || 'incident', // 'incident', 'emergency', 'update'
-        priority: alert.priority || 'medium', // 'low', 'medium', 'high'
-        radius: alert.radius || 5000, // meters
-        expiresAt: alert.expiresAt || Date.now() + 1000 * 60 * 60 * 24, // 24 hours
-        location: alert.location || null,
-        actions: alert.actions || []
-      }));
+      const response = await fetch(`${API_URL}/api/alerts`, {
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch alerts');
+      }
+      
+      const alerts = data.data.alerts || [];
 
       // Update cache
       const timestamp = Date.now();
       await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify({
-        alerts: enhancedAlerts,
+        alerts,
         timestamp
       }));
       
       set({ 
-        alerts: enhancedAlerts,
+        alerts,
         isLoading: false,
         lastSynced: timestamp
       });
@@ -57,22 +62,32 @@ export const useAlertsStore = create((set, get) => ({
   
   markAsRead: async (id) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Real API call to mark alert as read
+      const { token } = require('./auth-store').useAuthStore.getState();
       
-      const updatedAlerts = get().alerts.map(alert => 
-        alert.id === id 
-          ? { ...alert, read: true, updatedAt: Date.now() }
-          : alert
-      );
+      const response = await fetch(`${API_URL}/api/alerts/${id}/read`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
-      set({ alerts: updatedAlerts });
+      if (response.ok) {
+        const updatedAlerts = get().alerts.map(alert => 
+          alert.id === id 
+            ? { ...alert, read: true, updatedAt: Date.now() }
+            : alert
+        );
+        
+        set({ alerts: updatedAlerts });
 
-      // Update cache
-      await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify({
-        alerts: updatedAlerts,
-        timestamp: Date.now()
-      }));
+        // Update cache
+        await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify({
+          alerts: updatedAlerts,
+          timestamp: Date.now()
+        }));
+      }
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to mark alert as read'
@@ -82,22 +97,36 @@ export const useAlertsStore = create((set, get) => ({
   
   markAllAsRead: async () => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Real API call to mark all alerts as read
+      const { token } = require('./auth-store').useAuthStore.getState();
+      const alertIds = get().alerts.filter(alert => !alert.read).map(alert => alert.id);
       
-      const updatedAlerts = get().alerts.map(alert => ({ 
-        ...alert, 
-        read: true,
-        updatedAt: Date.now()
-      }));
+      if (alertIds.length === 0) return;
       
-      set({ alerts: updatedAlerts });
+      const response = await fetch(`${API_URL}/api/alerts/bulk/read`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ alertIds })
+      });
+      
+      if (response.ok) {
+        const updatedAlerts = get().alerts.map(alert => ({ 
+          ...alert, 
+          read: true,
+          updatedAt: Date.now()
+        }));
+        
+        set({ alerts: updatedAlerts });
 
-      // Update cache
-      await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify({
-        alerts: updatedAlerts,
-        timestamp: Date.now()
-      }));
+        // Update cache
+        await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify({
+          alerts: updatedAlerts,
+          timestamp: Date.now()
+        }));
+      }
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to mark all alerts as read'
@@ -107,17 +136,27 @@ export const useAlertsStore = create((set, get) => ({
 
   deleteAlert: async (id) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Real API call to delete alert
+      const { token } = require('./auth-store').useAuthStore.getState();
       
-      const updatedAlerts = get().alerts.filter(alert => alert.id !== id);
-      set({ alerts: updatedAlerts });
+      const response = await fetch(`${API_URL}/api/alerts/${id}/dismiss`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const updatedAlerts = get().alerts.filter(alert => alert.id !== id);
+        set({ alerts: updatedAlerts });
 
-      // Update cache
-      await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify({
-        alerts: updatedAlerts,
-        timestamp: Date.now()
-      }));
+        // Update cache
+        await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify({
+          alerts: updatedAlerts,
+          timestamp: Date.now()
+        }));
+      }
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to delete alert'

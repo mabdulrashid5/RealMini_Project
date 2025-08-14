@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { mockIncidents } from '@/mocks/incidents';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '@/utils/config';
 import { useAuthStore } from './auth-store';
 
 const INCIDENTS_STORAGE_KEY = '@incidents';
@@ -24,18 +24,25 @@ const store = (set, get) => ({
         set({ incidents, lastSynced: timestamp });
       }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Real API call - use all incidents for now
+      const response = await fetch(`${API_URL}/api/incidents`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch incidents');
+      }
+      
+      const incidents = data.data.incidents || [];
       
       // Update cache
       const timestamp = Date.now();
       await AsyncStorage.setItem(INCIDENTS_STORAGE_KEY, JSON.stringify({
-        incidents: mockIncidents,
+        incidents,
         timestamp
       }));
       
       set({ 
-        incidents: mockIncidents,
+        incidents,
         isLoading: false,
         lastSynced: timestamp
       });
@@ -70,11 +77,38 @@ const store = (set, get) => ({
       const isOnline = await checkOnlineStatus();
       
       if (isOnline) {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Real API call to create incident
+        const { token } = useAuthStore.getState();
+        
+        const response = await fetch(`${API_URL}/api/incidents`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            type: incidentData.type,
+            title: incidentData.title,
+            description: incidentData.description,
+            location: {
+              latitude: incidentData.location.latitude,
+              longitude: incidentData.location.longitude,
+              address: incidentData.location.address
+            },
+            severity: incidentData.severity || 'medium'
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to report incident');
+        }
+        
+        const createdIncident = data.data.incident;
         
         set({ 
-          incidents: [newIncident, ...get().incidents],
+          incidents: [createdIncident, ...get().incidents],
           isLoading: false
         });
 
@@ -108,17 +142,27 @@ const store = (set, get) => ({
       const isOnline = await checkOnlineStatus();
       
       if (isOnline) {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Real API call to upvote incident
+        const { token } = useAuthStore.getState();
         
-        const updatedIncidents = get().incidents.map((incident) => 
-          incident.id === id 
-            ? { ...incident, upvotes: incident.upvotes + 1, updatedAt: Date.now() }
-            : incident
-        );
+        const response = await fetch(`${API_URL}/api/incidents/${id}/upvote`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
-        set({ incidents: updatedIncidents });
-        await updateCache(updatedIncidents);
+        if (response.ok) {
+          const updatedIncidents = get().incidents.map((incident) => 
+            incident.id === id 
+              ? { ...incident, upvotes: incident.upvotes + 1, updatedAt: Date.now() }
+              : incident
+          );
+          
+          set({ incidents: updatedIncidents });
+          await updateCache(updatedIncidents);
+        }
       } else {
         // Store in pending actions
         const pendingActions = [...get().pendingActions, {
@@ -154,23 +198,33 @@ const store = (set, get) => ({
       }
 
       if (isOnline) {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Real API call to resolve incident
+        const { token } = useAuthStore.getState();
         
-        const updatedIncidents = get().incidents.map((incident) => 
-          incident.id === id 
-            ? { 
-                ...incident, 
-                status: 'resolved',
-                resolvedBy: user.id,
-                resolvedAt: Date.now(),
-                updatedAt: Date.now()
-              }
-            : incident
-        );
+        const response = await fetch(`${API_URL}/api/incidents/${id}/resolve`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
-        set({ incidents: updatedIncidents });
-        await updateCache(updatedIncidents);
+        if (response.ok) {
+          const updatedIncidents = get().incidents.map((incident) => 
+            incident.id === id 
+              ? { 
+                  ...incident, 
+                  status: 'resolved',
+                  resolvedBy: user.id,
+                  resolvedAt: Date.now(),
+                  updatedAt: Date.now()
+                }
+              : incident
+          );
+          
+          set({ incidents: updatedIncidents });
+          await updateCache(updatedIncidents);
+        }
       } else {
         // Store in pending actions
         const pendingActions = [...get().pendingActions, {
@@ -220,21 +274,32 @@ const store = (set, get) => ({
       };
 
       if (isOnline) {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Real API call to add comment
+        const { token } = useAuthStore.getState();
         
-        const updatedIncidents = get().incidents.map((incident) => 
-          incident.id === id 
-            ? { 
-                ...incident, 
-                comments: [...(incident.comments || []), newComment],
-                updatedAt: Date.now()
-              }
-            : incident
-        );
+        const response = await fetch(`${API_URL}/api/incidents/${id}/comments`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ text: comment })
+        });
         
-        set({ incidents: updatedIncidents });
-        await updateCache(updatedIncidents);
+        if (response.ok) {
+          const updatedIncidents = get().incidents.map((incident) => 
+            incident.id === id 
+              ? { 
+                  ...incident, 
+                  comments: [...(incident.comments || []), newComment],
+                  updatedAt: Date.now()
+                }
+              : incident
+          );
+          
+          set({ incidents: updatedIncidents });
+          await updateCache(updatedIncidents);
+        }
       } else {
         // Store in pending actions
         const pendingActions = [...get().pendingActions, {

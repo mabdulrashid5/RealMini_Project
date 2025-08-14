@@ -47,17 +47,32 @@ const store = (set, get) => ({
         throw new Error('Please enter a valid email address');
       }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Real API call
+      const response = await fetch(`${require('@/utils/config').API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
       
-      // Mock tokens
-      const token = 'mock_jwt_token';
-      const refreshToken = 'mock_refresh_token';
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+      
+      const { user, token, refreshToken } = data.data;
       
       set({ 
         user: {
-          ...mockUser,
-          lastLoginAt: Date.now()
+          id: user.id,
+          name: user.profile.name,
+          email: user.email,
+          avatar: user.profile.avatar,
+          role: user.permissions.includes('admin') ? 'admin' : 
+                user.permissions.includes('moderate') ? 'moderator' : 'user',
+          permissions: user.permissions,
+          createdAt: user.createdAt,
+          lastLoginAt: user.lastLoginAt
         },
         isAuthenticated: true,
         isLoading: false,
@@ -97,20 +112,36 @@ const store = (set, get) => ({
         throw new Error('Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number');
       }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Real API call
+      const response = await fetch(`${require('@/utils/config').API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email, 
+          password,
+          profile: { name }
+        })
+      });
       
-      // Mock tokens
-      const token = 'mock_jwt_token';
-      const refreshToken = 'mock_refresh_token';
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
+      }
+      
+      const { user, token, refreshToken } = data.data;
       
       set({ 
         user: {
-          ...mockUser,
-          name,
-          email,
-          createdAt: Date.now(),
-          lastLoginAt: Date.now()
+          id: user.id,
+          name: user.profile.name,
+          email: user.email,
+          avatar: user.profile.avatar,
+          role: user.permissions.includes('admin') ? 'admin' : 
+                user.permissions.includes('moderate') ? 'moderator' : 'user',
+          permissions: user.permissions,
+          createdAt: user.createdAt,
+          lastLoginAt: user.lastLoginAt
         },
         isAuthenticated: true,
         isLoading: false,
@@ -154,15 +185,27 @@ const store = (set, get) => ({
         throw new Error('No refresh token found');
       }
 
-      // Simulate API call to refresh token
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Mock new token
-      const newToken = 'new_mock_jwt_token';
-      
+      // Real API call to refresh token
+      const response = await fetch(`${require('@/utils/config').API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to refresh session');
+      }
+
+      const { token: newToken, refreshToken: newRefreshToken } = data.data;
+
       set({ token: newToken });
       await AsyncStorage.setItem('@auth_token', newToken);
-      
+      if (newRefreshToken) {
+        await AsyncStorage.setItem('@refresh_token', newRefreshToken);
+      }
+
       return true;
     } catch (error) {
       console.error('Error refreshing session:', error);
@@ -183,13 +226,38 @@ const store = (set, get) => ({
   
   updateUser: async (userData) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const { token } = get();
       
-      set({ user: userData });
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      
+      // Real API call to update profile
+      const response = await fetch(`${require('@/utils/config').API_URL}/api/auth/profile`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          profile: {
+            name: userData.name
+          }
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Profile update failed');
+      }
+      
+      // Update local state with new user data
+      set({ user: { ...get().user, ...userData } });
       return true;
     } catch (error) {
       console.error('Error updating user:', error);
+      set({ error: error.message });
       return false;
     }
   },
@@ -206,8 +274,18 @@ const store = (set, get) => ({
         throw new Error('Please enter a valid email address');
       }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Real API call for password reset
+      const response = await fetch(`${require('@/utils/config').API_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Password reset request failed');
+      }
       
       set({ isLoading: false });
       return true;
@@ -265,8 +343,30 @@ const store = (set, get) => ({
         throw new Error('New password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number');
       }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const { token } = get();
+      
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
+      // Real API call to change password
+      const response = await fetch(`${require('@/utils/config').API_URL}/api/auth/password`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Password change failed');
+      }
       
       set({ isLoading: false });
       return true;

@@ -14,19 +14,99 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MapPin, Search, Navigation2, Menu, AlertTriangle, Layers, Navigation, X, ArrowLeft, ArrowRight, ArrowUp } from 'lucide-react-native';
+import { MapPin, Search, Navigation2, Menu, AlertTriangle, Layers, Navigation, X, ArrowLeft, ArrowRight, ArrowUp, Settings, Route } from 'lucide-react-native';
 import * as Speech from 'expo-speech';
 import { colors } from '@/constants/colors';
 import { useIncidentsStore } from '@/store/incidents-store';
 import { useAuthStore } from '@/store/auth-store';
 import MapView, { Marker, PROVIDER_GOOGLE, Polyline, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { searchPlaces, getPlaceDetails, getDirections } from '@/utils/googleMapsHelpers';
+import { 
+  searchPlaces, 
+  getPlaceDetails, 
+  getDirections, 
+  getNearbyPlaces,
+  getTrafficInfo,
+  getPlaceAutocomplete 
+} from '@/utils/googleMapsHelpers';
+import { mapCache } from '@/utils/mapCache';
+import NearbyPlacesPanel from '@/components/NearbyPlacesPanel';
+import { animateToShowBounds, animateToNavigationView } from '@/utils/mapAnimations';
 import { decodePolyline } from '@/utils/polylineDecoder';
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyD6f4kc1k-aa0s1ndZWNpXiGkjj2CU_qgE';
 
-const StartNavigationOverlay = ({ distance, duration, destination, onStart, onClose }) => (
+const RoutePreferencesPanel = ({ preferences, onUpdate, onClose }) => (
+  <>
+    <TouchableOpacity 
+      style={styles.backdrop} 
+      activeOpacity={1} 
+      onPress={onClose}
+    />
+    <View style={styles.preferencesPanel}>
+      <View style={styles.panelHeader}>
+        <Text style={styles.panelTitle}>Route Preferences</Text>
+        <TouchableOpacity onPress={onClose} style={styles.closeButtonLarge}>
+          <X size={24} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+    
+    <View style={styles.preferenceSection}>
+      <Text style={styles.sectionTitle}>Travel Mode</Text>
+      <View style={styles.modeButtons}>
+        {['driving', 'walking', 'bicycling'].map((mode) => (
+          <TouchableOpacity
+            key={mode}
+            style={[
+              styles.modeButton,
+              { backgroundColor: preferences.mode === mode ? colors.primary : 'white' }
+            ]}
+            onPress={() => onUpdate({ ...preferences, mode })}
+          >
+            <Text style={[
+              styles.modeText,
+              { color: preferences.mode === mode ? 'white' : colors.text }
+            ]}>
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+
+    <View style={styles.preferenceSection}>
+      <Text style={styles.sectionTitle}>Avoid</Text>
+      <TouchableOpacity
+        style={styles.preferenceRow}
+        onPress={() => onUpdate({ ...preferences, avoidTolls: !preferences.avoidTolls })}
+      >
+        <Text style={styles.preferenceText}>Tolls</Text>
+        <View style={[
+          styles.checkbox,
+          { backgroundColor: preferences.avoidTolls ? colors.primary : 'white' }
+        ]}>
+          {preferences.avoidTolls && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        style={styles.preferenceRow}
+        onPress={() => onUpdate({ ...preferences, avoidHighways: !preferences.avoidHighways })}
+      >
+        <Text style={styles.preferenceText}>Highways</Text>
+        <View style={[
+          styles.checkbox,
+          { backgroundColor: preferences.avoidHighways ? colors.primary : 'white' }
+        ]}>
+          {preferences.avoidHighways && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+      </TouchableOpacity>
+    </View>
+  </View>
+  </>
+);
+
+const StartNavigationOverlay = ({ distance, duration, destination, onStart, onClose, alternativeRoutes }) => (
   <View style={styles.startNavigationOverlay}>
     <View style={styles.destinationHeader}>
       <Text style={styles.destinationTitle} numberOfLines={1}>
@@ -36,6 +116,7 @@ const StartNavigationOverlay = ({ distance, duration, destination, onStart, onCl
         <X size={24} color={colors.text} />
       </TouchableOpacity>
     </View>
+    
     <View style={styles.tripInfo}>
       <View style={styles.tripDetail}>
         <Text style={styles.tripValue}>{duration}</Text>
@@ -46,23 +127,73 @@ const StartNavigationOverlay = ({ distance, duration, destination, onStart, onCl
         <Text style={styles.tripLabel}>Distance</Text>
       </View>
     </View>
+
+    {alternativeRoutes && alternativeRoutes.length > 0 && (
+      <View style={styles.alternativeRoutes}>
+        <Text style={styles.alternativesTitle}>Alternative Routes</Text>
+        {alternativeRoutes.slice(0, 2).map((route, index) => (
+          <TouchableOpacity
+            key={route.id}
+            style={styles.alternativeRoute}
+            onPress={() => {
+              // Switch to this route
+              onStart(route);
+            }}
+          >
+            <Text style={styles.routeDuration}>{route.duration}</Text>
+            <Text style={styles.routeDistance}>{route.distance}</Text>
+            <Text style={styles.routeSummary} numberOfLines={1}>{route.summary}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    )}
+
     <TouchableOpacity style={styles.startButton} onPress={onStart}>
       <Text style={styles.startButtonText}>Start Navigation</Text>
     </TouchableOpacity>
   </View>
 );
 
-const NavigationOverlay = ({ instruction, distance, duration, onClose, nextManeuver, remainingSteps }) => (
+const NavigationOverlay = ({ 
+  instruction, 
+  distance, 
+  duration, 
+  onClose, 
+  nextManeuver, 
+  remainingSteps,
+  currentSpeed = 0,
+  destination
+}) => {
+  const speedKmh = Math.round(currentSpeed * 3.6);
+  
+  // Calculate ETA based on current time and duration
+  const now = new Date();
+  const durationMinutes = parseInt(duration?.replace(/\D/g, '')) || 0;
+  const eta = new Date(now.getTime() + durationMinutes * 60000);
+  const etaString = eta.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  
+  return (
   <View style={styles.navigationOverlay}>
     <View style={styles.navigationHeader}>
       <View style={styles.navigationTripInfo}>
-        <Text style={styles.navigationEta}>ETA: {duration}</Text>
-        <Text style={styles.navigationDistance}>{distance}</Text>
+          <View style={styles.etaContainer}>
+            <Text style={styles.etaTime}>{etaString}</Text>
+            <Text style={styles.etaLabel}>ETA</Text>
+          </View>
+          <View style={styles.durationContainer}>
+            <Text style={styles.tripDuration}>{duration}</Text>
+            <Text style={styles.tripDistanceText}>{distance}</Text>
+          </View>
+          <View style={styles.speedContainer}>
+            <Text style={styles.currentSpeedText}>{speedKmh}</Text>
+            <Text style={styles.speedUnitText}>km/h</Text>
+          </View>
       </View>
       <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-        <X size={24} color={colors.text} />
+          <X size={20} color="white" />
       </TouchableOpacity>
     </View>
+      
     <View style={styles.navigationInstructionContainer}>
       <View style={styles.navigationNextStep}>
         <View style={styles.maneuverIconContainer}>
@@ -70,29 +201,28 @@ const NavigationOverlay = ({ instruction, distance, duration, onClose, nextManeu
         </View>
         <View style={styles.instructionTextContainer}>
           <Text style={styles.navigationInstruction} numberOfLines={2}>
-            {instruction}
+              {instruction?.replace(/<[^>]*>/g, '') || 'Continue straight ahead'}
           </Text>
-          {remainingSteps > 0 && (
-            <Text style={styles.nextStepPreview}>
-              Then: {remainingSteps} more steps
+            <Text style={styles.destinationName} numberOfLines={1}>
+              to {destination?.name || 'destination'}
             </Text>
-          )}
         </View>
       </View>
     </View>
   </View>
 );
+};
 
 const getManeuverIcon = (maneuver) => {
   switch (maneuver) {
     case 'turn-left':
-      return <ArrowLeft size={32} color={colors.primary} />;
+      return <ArrowLeft size={24} color="white" />;
     case 'turn-right':
-      return <ArrowRight size={32} color={colors.primary} />;
+      return <ArrowRight size={24} color="white" />;
     case 'straight':
-      return <ArrowUp size={32} color={colors.primary} />;
+      return <ArrowUp size={24} color="white" />;
     default:
-      return <Navigation2 size={32} color={colors.primary} />;
+      return <Navigation2 size={24} color="white" />;
   }
 };
 
@@ -119,6 +249,18 @@ export default function MapScreen() {
   const [searchResults, setSearchResults] = useState([]);
   const [estimatedTime, setEstimatedTime] = useState(null);
   const [remainingDistance, setRemainingDistance] = useState(null);
+  const [alternativeRoutes, setAlternativeRoutes] = useState([]);
+  const [showTrafficLayer, setShowTrafficLayer] = useState(true);
+  const [routePreferences, setRoutePreferences] = useState({
+    avoidTolls: false,
+    avoidHighways: false,
+    mode: 'driving'
+  });
+  const [showPreferences, setShowPreferences] = useState(false);
+  const [showNearbyPlaces, setShowNearbyPlaces] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [currentSpeed, setCurrentSpeed] = useState(0);
+  const [navigationMode, setNavigationMode] = useState('overview'); // overview, following, navigation
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -160,8 +302,8 @@ export default function MapScreen() {
         locationSubscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.BestForNavigation,
-            distanceInterval: 5,
-            timeInterval: 2000,
+            distanceInterval: 1, // More sensitive for live following
+            timeInterval: 500,   // Much more frequent updates
             activityType: Location.ActivityType.AutomotiveNavigation,
             showsBackgroundLocationIndicator: true
           },
@@ -171,18 +313,8 @@ export default function MapScreen() {
             if (navigationStarted && selectedPlace) {
               updateRouteToDestination(newLocation.coords, selectedPlace);
               
-              if (mapRef.current && newLocation.coords.heading) {
-                mapRef.current.animateCamera({
-                  center: {
-                    latitude: newLocation.coords.latitude,
-                    longitude: newLocation.coords.longitude,
-                  },
-                  heading: newLocation.coords.heading,
-                  pitch: 60,
-                  zoom: 18,
-                  duration: 1000
-                });
-              }
+              // Google Maps-style dynamic camera following
+              updateNavigationCamera(newLocation.coords);
             }
           }
         );
@@ -257,12 +389,36 @@ export default function MapScreen() {
       }
 
       if (shouldUpdateRoute) {
-        const result = await getDirections(currentLocation, destination, GOOGLE_MAPS_API_KEY);
+        const result = await mapCache.getDirectionsWithCache(
+          getDirections,
+          currentLocation, 
+          destination, 
+          GOOGLE_MAPS_API_KEY, 
+          {
+            alternatives: true,
+            avoidTolls: routePreferences.avoidTolls,
+            avoidHighways: routePreferences.avoidHighways,
+            mode: routePreferences.mode,
+            trafficModel: 'best_guess',
+            departureTime: 'now'
+          }
+        );
         
         if (result.routes && result.routes.length > 0) {
+          // Main route
           const route = result.routes[0];
           const points = decodePolyline(route.overview_polyline.points);
           setSelectedRoute(points);
+          
+          // Alternative routes
+          const alternatives = result.routes.slice(1, 3).map((altRoute, index) => ({
+            id: `alt-${index}`,
+            coordinates: decodePolyline(altRoute.overview_polyline.points),
+            duration: altRoute.legs[0].duration.text,
+            distance: altRoute.legs[0].distance.text,
+            summary: altRoute.summary
+          }));
+          setAlternativeRoutes(alternatives);
           
           if (route.legs && route.legs[0]) {
             setEstimatedTime(route.legs[0].duration.text);
@@ -349,6 +505,37 @@ export default function MapScreen() {
     });
   };
 
+  // Google Maps-style dynamic camera following
+  const updateNavigationCamera = (currentLocation) => {
+    if (!mapRef.current || !currentLocation) return;
+
+    const speed = currentLocation.speed || 0; // m/s
+    const speedKmh = speed * 3.6; // Convert to km/h
+    
+    // Dynamic zoom based on speed (like Google Maps)
+    let zoom = 18; // Default close zoom
+    if (speedKmh > 80) zoom = 15;      // Highway speed - zoom out more
+    else if (speedKmh > 50) zoom = 16; // Fast city driving
+    else if (speedKmh > 20) zoom = 17; // Normal city driving
+    else zoom = 18;                    // Slow/stationary - zoom in close
+    
+    // Dynamic pitch based on speed
+    let pitch = 45; // Default pitch
+    if (speedKmh > 30) pitch = 60;     // Higher pitch at speed for better road view
+    else if (speedKmh < 5) pitch = 30; // Lower pitch when slow/stationary
+    
+    // Smooth camera animation with heading
+    mapRef.current.animateCamera({
+      center: {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+      },
+      heading: currentLocation.heading || 0,
+      pitch: pitch,
+      zoom: zoom,
+    }, 800); // Shorter duration for smoother following
+  };
+
   const handleSearchSelection = async (item) => {
     try {
       const details = await getPlaceDetails(item.place_id, GOOGLE_MAPS_API_KEY);
@@ -380,22 +567,9 @@ export default function MapScreen() {
           }
         }
 
-        // Show both current location and destination in the map view
-        const bounds = {
-          north: Math.max(location.latitude, destination.latitude),
-          south: Math.min(location.latitude, destination.latitude),
-          east: Math.max(location.longitude, destination.longitude),
-          west: Math.min(location.longitude, destination.longitude),
-        };
-        
-        // Add some padding to the bounds
-        const padding = 0.3; // increased to 30% padding for better visibility
-        mapRef.current?.animateToRegion({
-          latitude: (bounds.north + bounds.south) / 2,
-          longitude: (bounds.east + bounds.west) / 2,
-          latitudeDelta: (bounds.north - bounds.south) * (1 + padding),
-          longitudeDelta: (bounds.east - bounds.west) * (1 + padding),
-        }, 1000);
+        // Show both current location and destination with smooth animation
+        const coordinates = [location, destination];
+        animateToShowBounds(mapRef, coordinates, 0.3);
       }
     } catch (error) {
       console.error('Error selecting place:', error);
@@ -422,20 +596,29 @@ export default function MapScreen() {
         }}
         onMapReady={() => {
           console.log('Map is ready');
+          setMapReady(true);
+          // Preload common data when map is ready
+          if (location) {
+            mapCache.preloadCommonData(location, GOOGLE_MAPS_API_KEY);
+          }
         }}
         onError={(error) => {
           console.error('Map error:', error);
         }}
         showsUserLocation={true}
         showsMyLocationButton={false}
-        followsUserLocation={navigationStarted}
+        followsUserLocation={false} // We handle this manually for better control
         showsCompass={true}
-        showsTraffic={true}
+        showsTraffic={showTrafficLayer}
         loadingEnabled={true}
-        rotateEnabled={true}
+        rotateEnabled={!navigationStarted} // Disable rotation during navigation
         pitchEnabled={true}
         zoomEnabled={true}
+        scrollEnabled={!navigationStarted} // Disable manual scrolling during navigation
         paddingAdjustmentBehavior="automatic"
+        userLocationPriority="high"
+        userLocationUpdateInterval={1000}
+        userLocationFastestInterval={500}
         mapPadding={{ top: 100, right: 20, bottom: navigationStarted ? 300 : 100, left: 20 }}
       >
         {selectedPlace && (
@@ -455,10 +638,33 @@ export default function MapScreen() {
         {selectedRoute && (
           <Polyline
             coordinates={selectedRoute}
-            strokeWidth={4}
-            strokeColor={colors.primary}
+            strokeWidth={navigationStarted ? 8 : 6} // Thicker during navigation
+            strokeColor={navigationStarted ? '#2196F3' : colors.primary} // Blue during navigation
+            strokeOpacity={navigationStarted ? 1.0 : 0.8}
+            lineDashPattern={[0]}
+            geodesic={true} // More accurate curved lines
+            lineJoin="round"
+            lineCap="round"
           />
         )}
+
+        {/* Alternative routes */}
+        {alternativeRoutes.map((route, index) => (
+          <Polyline
+            key={route.id}
+            coordinates={route.coordinates}
+            strokeColor={index === 0 ? '#4CAF50' : '#FF9800'}
+            strokeWidth={4}
+            strokeOpacity={0.6}
+            lineDashPattern={[5, 5]}
+            onPress={() => {
+              // Switch to alternative route
+              setSelectedRoute(route.coordinates);
+              setEstimatedTime(route.duration);
+              setRemainingDistance(route.distance);
+            }}
+          />
+        ))}
 
         {incidents.map((incident) => (
           <Marker
@@ -473,41 +679,50 @@ export default function MapScreen() {
         ))}
       </MapView>
 
-      <View style={styles.searchBar}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search destination..."
-          value={searchInput}
-          onChangeText={async (text) => {
-            setSearchInput(text);
-            if (text.length > 2) {
-              const results = await searchPlaces(text, GOOGLE_MAPS_API_KEY);
-              setSearchResults(results?.predictions || []);
-            } else {
-              setSearchResults([]);
-            }
-          }}
-        />
-        {searchResults.length > 0 && (
-          <View style={styles.searchResultsContainer}>
-            <FlatList
-              data={searchResults}
-              keyExtractor={(item) => item.place_id}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={true}
-              bounces={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.searchResultItem}
-                  onPress={() => handleSearchSelection(item)}
-                >
-                  <Text style={styles.searchResultText}>{item.description}</Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        )}
-      </View>
+      {!navigationStarted && (
+        <View style={styles.searchBar}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search destination..."
+            value={searchInput}
+            onChangeText={async (text) => {
+              setSearchInput(text);
+              if (text.length > 2) {
+                try {
+                  console.log('Searching for:', text);
+                const results = await searchPlaces(text, GOOGLE_MAPS_API_KEY);
+                  console.log('Search results:', results);
+                setSearchResults(results?.predictions || []);
+                } catch (error) {
+                  console.error('Search error:', error);
+                  setSearchResults([]);
+                }
+              } else {
+                setSearchResults([]);
+              }
+            }}
+          />
+          {searchResults.length > 0 && (
+            <View style={styles.searchResultsContainer}>
+              <FlatList
+                data={searchResults}
+                keyExtractor={(item) => item.place_id}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={true}
+                bounces={false}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.searchResultItem}
+                    onPress={() => handleSearchSelection(item)}
+                  >
+                    <Text style={styles.searchResultText}>{item.description}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          )}
+        </View>
+      )}
 
       <View style={styles.mapControls}>
         <TouchableOpacity
@@ -516,6 +731,30 @@ export default function MapScreen() {
         >
           <Navigation size={24} color={colors.primary} />
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.controlButton,
+            { backgroundColor: showTrafficLayer ? colors.primary : 'white' }
+          ]}
+          onPress={() => setShowTrafficLayer(!showTrafficLayer)}
+        >
+          <Route size={24} color={showTrafficLayer ? 'white' : colors.primary} />
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.controlButton}
+          onPress={() => setShowNearbyPlaces(true)}
+        >
+          <MapPin size={24} color={colors.primary} />
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.controlButton}
+          onPress={() => setShowPreferences(true)}
+        >
+          <Settings size={24} color={colors.primary} />
+        </TouchableOpacity>
+        
         <TouchableOpacity
           style={styles.controlButton}
           onPress={handleMapTypeChange}
@@ -529,27 +768,43 @@ export default function MapScreen() {
           destination={selectedPlace}
           distance={remainingDistance}
           duration={estimatedTime}
-          onStart={() => {
+          alternativeRoutes={alternativeRoutes}
+          onStart={(selectedRoute) => {
+            if (selectedRoute) {
+              // User selected an alternative route
+              setSelectedRoute(selectedRoute.coordinates);
+              setEstimatedTime(selectedRoute.duration);
+              setRemainingDistance(selectedRoute.distance);
+            }
             setNavigationStarted(true);
             updateRouteToDestination(location, selectedPlace);
-            // Animate to navigation view
-            mapRef.current?.animateCamera({
-              center: {
-                latitude: location.latitude,
-                longitude: location.longitude,
-              },
-              heading: location.heading || 0,
-              pitch: 60,
-              zoom: 18,
-              duration: 1000
-            });
+            // Animate to navigation view with smooth transition
+            animateToNavigationView(mapRef, location, location.heading || 0);
           }}
           onClose={() => {
             setSelectedPlace(null);
             setSelectedRoute(null);
             setEstimatedTime(null);
             setRemainingDistance(null);
+            setAlternativeRoutes([]);
           }}
+        />
+      )}
+
+      {showPreferences && (
+        <RoutePreferencesPanel
+          preferences={routePreferences}
+          onUpdate={(newPreferences) => {
+            setRoutePreferences(newPreferences);
+            // Recalculate route with new preferences if we have a destination
+            if (selectedPlace && location) {
+              handleSearchSelection({ 
+                place_id: 'recalculate',
+                description: selectedPlace.name 
+              });
+            }
+          }}
+          onClose={() => setShowPreferences(false)}
         />
       )}
 
@@ -558,14 +813,36 @@ export default function MapScreen() {
           instruction={navigationInstructions[activeStep]?.instruction}
           distance={remainingDistance}
           duration={estimatedTime}
+          currentSpeed={currentSpeed}
+          destination={selectedPlace}
+          nextManeuver={navigationInstructions[activeStep]?.maneuver}
           onClose={() => {
             setNavigationStarted(false);
             setSelectedRoute(null);
             setSelectedPlace(null);
             setNavigationInstructions([]);
+            setNavigationMode('overview');
           }}
         />
       )}
+
+
+
+      <NearbyPlacesPanel
+        visible={showNearbyPlaces}
+        location={location}
+        apiKey={GOOGLE_MAPS_API_KEY}
+        onPlaceSelect={(place) => {
+          setSelectedPlace(place);
+          setShowNearbyPlaces(false);
+          // Calculate route to selected place
+          handleSearchSelection({
+            place_id: place.placeId,
+            description: place.name
+          });
+        }}
+        onClose={() => setShowNearbyPlaces(false)}
+      />
     </View>
   );
 }
@@ -584,7 +861,170 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    maxHeight: '50%',
+    maxHeight: '60%',
+  },
+  alternativeRoutes: {
+    marginBottom: 15,
+  },
+  alternativesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 10,
+  },
+  alternativeRoute: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  routeDuration: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    minWidth: 50,
+  },
+  routeDistance: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginLeft: 8,
+    minWidth: 40,
+  },
+  routeSummary: {
+    fontSize: 12,
+    color: colors.text,
+    marginLeft: 8,
+    flex: 1,
+  },
+  preferencesPanel: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    maxHeight: '60%',
+    zIndex: 1000,
+  },
+  panelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  panelTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  preferenceSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 10,
+  },
+  modeButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  modeText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  preferenceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  preferenceText: {
+    fontSize: 16,
+    color: colors.text,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkmark: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
+  },
+  closeButtonLarge: {
+    padding: 8,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  speedIndicator: {
+    position: 'absolute',
+    top: 100,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 60,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  speedValue: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    lineHeight: 20,
+  },
+  speedUnit: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '500',
+    opacity: 0.8,
   },
   destinationHeader: {
     flexDirection: 'row',
@@ -659,12 +1099,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     marginTop: 5,
     borderRadius: 8,
-    maxHeight: '70%',
+    maxHeight: 300, // Fixed height instead of percentage
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
+    elevation: 10, // Higher elevation
+    zIndex: 1000, // Ensure it appears on top
     position: 'absolute',
     top: '100%',
     left: 0,
@@ -722,66 +1163,109 @@ const styles = StyleSheet.create({
   },
   navigationOverlay: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 100 : 90, // Significantly increased bottom margin
+    top: Platform.OS === 'ios' ? 50 : 30,
     left: 16,
     right: 16,
-    backgroundColor: 'white',
-    borderRadius: 20,
+    backgroundColor: '#1E3A8A', // Deep blue like real GPS apps
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    marginBottom: 20, // Increased margin from bottom
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   navigationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: 'rgba(255,255,255,0.2)',
   },
   navigationTripInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     flex: 1,
   },
-  navigationEta: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 4,
+  etaContainer: {
+    alignItems: 'center',
+    flex: 1,
   },
-  navigationDistance: {
+  etaTime: {
     fontSize: 16,
-    color: colors.textSecondary,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  etaLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  durationContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  tripDuration: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+  },
+  tripDistanceText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  speedContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  currentSpeedText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4ADE80', // Green for speed
+  },
+  speedUnitText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
   closeButton: {
     padding: 8,
   },
   navigationInstructionContainer: {
-    padding: 20,
+    padding: 16,
   },
   navigationNextStep: {
-    backgroundColor: colors.background,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     padding: 16,
     borderRadius: 12,
   },
   navigationInstruction: {
     fontSize: 18,
-    color: colors.text,
+    color: 'white',
     lineHeight: 24,
+    fontWeight: '600',
   },
-  maneuverIconContainer: {
-    width: 60,
-    height: 60,
-    backgroundColor: colors.background,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
+  destinationName: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   instructionTextContainer: {
     flex: 1,
+    marginLeft: 12,
+  },
+  maneuverIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   nextStepPreview: {
     fontSize: 14,

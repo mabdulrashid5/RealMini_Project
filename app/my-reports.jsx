@@ -1,12 +1,18 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { colors } from '@/constants/colors';
 import { Clock, CheckCircle2, AlertTriangle, XCircle, ChevronRight } from 'lucide-react-native';
+import { useAuthStore } from '@/store/auth-store';
+import { API_URL } from '@/utils/config';
 
 export default function MyReportsScreen() {
   const router = useRouter();
+  const { token } = useAuthStore();
   const [activeFilter, setActiveFilter] = useState('all');
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const filters = [
     { id: 'all', label: 'All' },
@@ -15,38 +21,73 @@ export default function MyReportsScreen() {
     { id: 'resolved', label: 'Resolved' },
   ];
 
-  const reports = [
-    {
-      id: 1,
-      type: 'Road Hazard',
-      description: 'Large pothole in the middle of the road',
-      location: '123 Main Street',
-      timestamp: '2 hours ago',
-      status: 'pending',
-      image: 'https://images.unsplash.com/photo-1597638563472-b8eb0966b77b?auto=format&fit=crop&w=200&q=80',
-      upvotes: 5,
-    },
-    {
-      id: 2,
-      type: 'Traffic Accident',
-      description: 'Minor collision between two vehicles',
-      location: 'Junction of 5th Ave and Park Road',
-      timestamp: '1 day ago',
-      status: 'verified',
-      image: 'https://images.unsplash.com/photo-1599012307530-1c5b2e0e7f9a?auto=format&fit=crop&w=200&q=80',
-      upvotes: 12,
-    },
-    {
-      id: 3,
-      type: 'Construction',
-      description: 'Road work causing traffic delays',
-      location: 'Highway 101 North',
-      timestamp: '3 days ago',
-      status: 'resolved',
-      image: 'https://images.unsplash.com/photo-1517420879524-86d64ac2f339?auto=format&fit=crop&w=200&q=80',
-      upvotes: 8,
-    },
-  ];
+  // Fetch user's reports from backend
+  const fetchMyReports = async () => {
+    if (!token) {
+      console.log('No token available');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/users/incidents`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Transform backend data to match frontend format
+        const transformedReports = data.data.incidents.map(incident => ({
+          id: incident._id,
+          type: incident.type,
+          description: incident.description,
+          location: incident.address || `${incident.location.coordinates[1]}, ${incident.location.coordinates[0]}`,
+          timestamp: formatTimestamp(incident.createdAt),
+          status: incident.status,
+          image: incident.images && incident.images.length > 0 ? incident.images[0] : null,
+          upvotes: incident.upvotes || 0,
+          severity: incident.severity,
+        }));
+        
+        setReports(transformedReports);
+      } else {
+        console.error('Failed to fetch reports:', data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching my reports:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Format timestamp to readable format
+  const formatTimestamp = (timestamp) => {
+    const now = new Date();
+    const reportTime = new Date(timestamp);
+    const diffInMinutes = Math.floor((now - reportTime) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
+    if (diffInMinutes < 10080) return `${Math.floor(diffInMinutes / 1440)} days ago`;
+    return reportTime.toLocaleDateString();
+  };
+
+  // Refresh reports
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchMyReports();
+  };
+
+  useEffect(() => {
+    fetchMyReports();
+  }, [token]);
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -115,8 +156,36 @@ export default function MyReportsScreen() {
       </ScrollView>
       </View>
 
-      <ScrollView style={styles.reportsList}>
-        {filteredReports.map((report) => (
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading your reports...</Text>
+        </View>
+      ) : (
+        <ScrollView 
+          style={styles.reportsList}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
+        >
+          {filteredReports.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <AlertTriangle size={48} color={colors.textSecondary} />
+              <Text style={styles.emptyText}>No reports found</Text>
+              <Text style={styles.emptySubtext}>
+                {activeFilter === 'all' 
+                  ? 'You haven\'t reported any incidents yet'
+                  : `No ${activeFilter} reports found`
+                }
+              </Text>
+            </View>
+          ) : (
+            filteredReports.map((report) => (
           <TouchableOpacity
             key={report.id}
             style={styles.reportCard}
@@ -158,8 +227,10 @@ export default function MyReportsScreen() {
               </View>
             </View>
           </TouchableOpacity>
-        ))}
+            ))
+          )}
       </ScrollView>
+      )}
     </View>
   );
 }
@@ -267,5 +338,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginRight: 4,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    minHeight: 300,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
   },
 }); 
