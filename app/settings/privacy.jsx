@@ -77,13 +77,28 @@ export default function PrivacyScreen() {
 
   const handleDeleteAccount = async () => {
     try {
+      console.log('Starting delete account process with password length:', deletePassword?.length);
       setIsLoading(true);
       const success = await deleteAccount(deletePassword);
+      console.log('Delete account response:', success);
       if (success) {
-        Alert.alert('Account Deleted', 'Your account has been successfully deleted.');
-        router.replace('/(auth)');
+        Alert.alert(
+          'Account Deleted', 
+          'Your account has been successfully deleted.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                console.log('Navigating to get-started');
+                router.replace('/(auth)/get-started');
+              }
+            }
+          ],
+          { cancelable: false }
+        );
       }
     } catch (error) {
+      console.error('Delete account error:', error);
       Alert.alert('Error', error.message);
     } finally {
       setIsLoading(false);
@@ -93,12 +108,23 @@ export default function PrivacyScreen() {
   };
 
   const handleChangePassword = async () => {
-    if (newPassword !== confirmNewPassword) {
-      Alert.alert('Error', 'New passwords do not match');
-      return;
-    }
-
     try {
+      // Validate password match
+      if (newPassword !== confirmNewPassword) {
+        Alert.alert('Error', 'New passwords do not match');
+        return;
+      }
+
+      // Validate password requirements
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+      if (!passwordRegex.test(newPassword)) {
+        Alert.alert(
+          'Invalid Password',
+          'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number'
+        );
+        return;
+      }
+
       setIsLoading(true);
       const success = await changePassword(currentPassword, newPassword);
       if (success) {

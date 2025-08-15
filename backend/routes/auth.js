@@ -1,9 +1,17 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { protect, verifyRefreshToken, sensitiveOperation } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Password validation middleware for sensitive operations
+const validatePassword = [
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required for this operation')
+];
 
 // Validation middleware
 const validateRegistration = [
@@ -368,13 +376,22 @@ router.put('/password', protect, sensitiveOperation, [
       });
     }
 
-    // Update password
+    // Update password and invalidate all refresh tokens
     user.password = newPassword;
+    user.refreshTokens = []; // Clear all refresh tokens to force other devices to login again
     await user.save();
 
+    // Generate new tokens for current session
+    const token = user.getSignedJwtToken();
+    const refreshToken = user.getRefreshToken();
+    
     res.json({
       success: true,
-      message: 'Password changed successfully'
+      message: 'Password changed successfully',
+      data: {
+        token,
+        refreshToken
+      }
     });
   } catch (error) {
     console.error('Password change error:', error);
@@ -451,7 +468,68 @@ router.post('/device-token', protect, [
     console.error('Device token error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to add device token',
+      message: 'Failed to add device token'
+    });
+  }
+});
+
+// @desc    Delete user account
+// @route   DELETE /api/auth/account
+// @access  Private
+router.delete('/account', protect, validatePassword, handleValidationErrors, async (req, res) => {
+  try {
+    console.log('Account deletion request received');
+    const { password } = req.body;
+    console.log('Looking up user:', req.user.id);
+    const user = await User.findById(req.user.id).select('+password');
+
+    if (!user) {
+      console.log('User not found');
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify password
+    console.log('Verifying password');
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      console.log('Password verification failed');
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid password'
+      });
+    }
+
+    console.log('Password verified, deleting associated data');
+    // Delete associated data first (incidents, alerts, etc.)
+    try {
+      await Promise.all([
+        mongoose.model('Incident').deleteMany({ user: req.user.id }),
+        mongoose.model('Alert').deleteMany({ user: req.user.id })
+      ]);
+      console.log('Associated data deleted successfully');
+    } catch (error) {
+      console.error('Error deleting associated data:', error);
+      // Continue with user deletion even if associated data deletion fails
+    }
+
+    console.log('Deleting user account');
+    // Delete user
+    await User.findByIdAndDelete(req.user.id);
+    console.log('User account deleted successfully');
+
+    res.json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+  } catch (error) {
+    console.error('Account deletion error:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete account',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }

@@ -49,16 +49,18 @@ const incidentSchema = new mongoose.Schema({
       required: [true, 'Coordinates are required'],
       validate: {
         validator: function(coords) {
-          return coords.length === 2 && 
+          return Array.isArray(coords) && 
+                 coords.length === 2 && 
+                 !isNaN(coords[0]) && !isNaN(coords[1]) &&
                  coords[0] >= -180 && coords[0] <= 180 && // longitude
                  coords[1] >= -90 && coords[1] <= 90;     // latitude
         },
-        message: 'Invalid coordinates format'
+        message: 'Invalid coordinates format. Must be [longitude, latitude] with valid values'
       }
     },
     address: {
       type: String,
-      required: [true, 'Address is required'],
+      required: false,
       maxlength: [200, 'Address cannot exceed 200 characters']
     }
   },

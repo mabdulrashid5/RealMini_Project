@@ -4,7 +4,7 @@
     "slug": "road-watch",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/branding/icon.png",
     "scheme": "roadwatch",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -20,7 +20,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/branding/icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "app.rork.road-safety-reporter-app",

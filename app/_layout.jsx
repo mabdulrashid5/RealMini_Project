@@ -20,6 +20,7 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
   const [isCustomSplashVisible, setIsCustomSplashVisible] = useState(true);
+  const [initialRoute, setInitialRoute] = useState(null);
 
   useEffect(() => {
     if (error) {
@@ -34,7 +35,20 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  if (!loaded) {
+  // Initialize auth state when app loads
+  useEffect(() => {
+    if (loaded) {
+      const { initializeAuth, isAuthenticated } = require('@/store/auth-store').useAuthStore.getState();
+      initializeAuth()
+        .then(() => {
+          // If user is authenticated, go to tabs, otherwise auth flow
+          setInitialRoute(isAuthenticated ? "(tabs)" : "(auth)");
+        })
+        .catch(console.error);
+    }
+  }, [loaded]);
+
+  if (!loaded || !initialRoute) {
     return null;
   }
 
@@ -42,14 +56,14 @@ export default function RootLayout() {
     return <CustomSplashScreen onComplete={() => setIsCustomSplashVisible(false)} />;
   }
 
-  return <RootLayoutNav />;
+  return <RootLayoutNav initialRoute={initialRoute} />;
 }
 
-function RootLayoutNav() {
+function RootLayoutNav({ initialRoute }) {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" />
-      <Stack
+      <Stack initialRouteName={initialRoute}
         screenOptions={{
           headerBackTitle: "Back",
           headerStyle: {

@@ -156,7 +156,9 @@ export const IncidentCard = ({
           onPress={handleUpvote}
         >
           <ThumbsUp size={16} color={colors.primary} />
-          <Text style={styles.upvoteCount}>{incident.upvotes}</Text>
+          <Text style={styles.upvoteCount}>
+            {Array.isArray(incident.upvotes) ? incident.upvotes.length : 0}
+          </Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

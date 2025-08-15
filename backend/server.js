@@ -72,7 +72,8 @@ app.use(compression());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' ? 
     ['https://your-app-domain.com'] : 
-    ['http://localhost:3000', 'exp://192.168.1.100:19000'], // Add your Expo dev URLs
+    ['http://100.112.30.225:3000', 'exp://100.112.30.225:19000'], // Add your Expo dev URLs
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true
 }));
 

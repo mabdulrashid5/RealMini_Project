@@ -4,6 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { MapPin, Clock, ThumbsUp, Share2, Flag, CheckCircle } from 'lucide-react-native';
 import { colors } from '@/constants/colors';
 import { useIncidentsStore } from '@/store/incidents-store';
+import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/Button';
 
 // Mock map component for web compatibility
@@ -32,7 +33,9 @@ const Marker = ({ coordinate, ...props }) => {
 export default function IncidentDetailScreen() {
   const { id } = useLocalSearchParams();
   const { incidents, upvoteIncident, resolveIncident, isLoading } = useIncidentsStore();
+  const { user } = useAuthStore();
   const [incident, setIncident] = useState(null);
+  const canResolve = user?.permissions?.includes('resolve');
   
   useEffect(() => {
     if (incidents.length > 0 && id) {
@@ -181,7 +184,10 @@ export default function IncidentDetailScreen() {
           style={styles.actionButton}
           onPress={handleUpvote}
         >
-          <ThumbsUp size={20} color={colors.text} />
+          <ThumbsUp 
+            size={20} 
+            color={colors.text} 
+          />
           <Text style={styles.actionText}>
             {incident.upvotes} Upvotes
           </Text>
@@ -203,7 +209,7 @@ export default function IncidentDetailScreen() {
         </TouchableOpacity>
       </View>
       
-      {incident.status !== 'resolved' && (
+      {canResolve && incident.status !== 'resolved' && (
         <Button
           title="Mark as Resolved"
           onPress={handleResolve}

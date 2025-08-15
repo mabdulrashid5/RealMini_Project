@@ -396,13 +396,23 @@ router.post('/', protect, upload.array('images', 5), [
     .trim()
     .isLength({ min: 10, max: 1000 })
     .withMessage('Description must be between 10 and 1000 characters'),
-  body('location.latitude')
-    .isFloat({ min: -90, max: 90 })
-    .withMessage('Invalid latitude'),
-  body('location.longitude')
+  body('location')
+    .isObject()
+    .withMessage('Location is required'),
+  body('location.type')
+    .equals('Point')
+    .withMessage('Invalid location type'),
+  body('location.coordinates')
+    .isArray()
+    .withMessage('Invalid coordinates format'),
+  body('location.coordinates.0')
     .isFloat({ min: -180, max: 180 })
     .withMessage('Invalid longitude'),
+  body('location.coordinates.1')
+    .isFloat({ min: -90, max: 90 })
+    .withMessage('Invalid latitude'),
   body('location.address')
+    .optional()
     .trim()
     .isLength({ min: 5, max: 200 })
     .withMessage('Address must be between 5 and 200 characters'),
@@ -412,7 +422,37 @@ router.post('/', protect, upload.array('images', 5), [
     .withMessage('Invalid severity')
 ], handleValidationErrors, async (req, res) => {
   try {
+    console.log('Creating incident with data:', req.body);
     const { type, title, description, location, severity, tags } = req.body;
+
+    // Additional location validation
+    if (!location || !location.type || !Array.isArray(location.coordinates)) {
+      console.error('Invalid location format:', location);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid location format',
+        error: 'Location must include type and coordinates array'
+      });
+    }
+
+    // Validate coordinates
+    if (location.coordinates.length !== 2 || 
+        !location.coordinates.every(coord => typeof coord === 'number' && !isNaN(coord))) {
+      console.error('Invalid coordinates:', location.coordinates);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid coordinates',
+        error: 'Coordinates must be an array of two numbers [longitude, latitude]'
+      });
+    }
+
+    // Log validation results
+    console.log('Location validation passed:', {
+      hasLocation: !!location,
+      locationType: location.type,
+      coordinates: location.coordinates,
+      address: location.address
+    });
 
     // Upload images if provided
     let images = [];
@@ -429,6 +469,13 @@ router.post('/', protect, upload.array('images', 5), [
       }
     }
 
+    console.log('Creating incident with validated data:', {
+      type,
+      title,
+      description,
+      location
+    });
+
     // Create incident
     const incident = await Incident.create({
       type,
@@ -436,13 +483,19 @@ router.post('/', protect, upload.array('images', 5), [
       description,
       location: {
         type: 'Point',
-        coordinates: [parseFloat(location.longitude), parseFloat(location.latitude)],
+        coordinates: location.coordinates,
         address: location.address
       },
       images,
       reportedBy: req.user._id,
       severity: severity || 'medium',
       tags: tags ? tags.split(',').map(tag => tag.trim().toLowerCase()) : []
+    });
+
+    console.log('Successfully created incident:', {
+      id: incident._id,
+      type: incident.type,
+      location: incident.location
     });
 
     // Populate the incident for response

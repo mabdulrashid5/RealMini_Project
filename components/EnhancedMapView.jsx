@@ -22,10 +22,12 @@ import {
   Hospital,
   Car,
   Layers,
-  Settings
+  Settings,
+  Shield
 } from 'lucide-react-native';
 import { colors } from '@/constants/colors';
 import { getNearbyPlaces, getTrafficInfo } from '@/utils/googleMapsHelpers';
+import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -42,6 +44,31 @@ const TRAFFIC_COLORS = {
   moderate: '#FF9800', 
   heavy: '#F44336',
   unknown: '#9E9E9E'
+};
+
+const getIncidentMarkerStyle = (type) => {
+  switch (type) {
+    case 'accident':
+      return {
+        color: '#FF4444',
+        icon: <Car size={16} color="white" />
+      };
+    case 'hazard':
+      return {
+        color: '#FFB300',
+        icon: <AlertTriangle size={16} color="white" />
+      };
+    case 'violation':
+      return {
+        color: '#7C4DFF',
+        icon: <Shield size={16} color="white" />
+      };
+    default:
+      return {
+        color: '#757575',
+        icon: <AlertTriangle size={16} color="white" />
+      };
+  }
 };
 
 const EnhancedMapView = ({ 
@@ -171,21 +198,36 @@ const EnhancedMapView = ({
         ))}
 
         {/* Incident markers */}
-        {incidents?.map((incident) => (
-          <Marker
-            key={incident.id}
-            coordinate={{
-              latitude: incident.location.latitude,
-              longitude: incident.location.longitude
-            }}
-            title={incident.title}
-            description={incident.description}
-          >
-            <View style={[styles.incidentMarker, { backgroundColor: colors.error }]}>
-              <AlertTriangle size={16} color="white" />
-            </View>
-          </Marker>
-        ))}
+        {incidents?.map((incident) => {
+          // Get marker color and icon based on incident type
+          const markerStyle = getIncidentMarkerStyle(incident.type);
+          
+          return (
+            <Marker
+              key={incident.id}
+              coordinate={{
+                latitude: incident.location.latitude,
+                longitude: incident.location.longitude
+              }}
+              title={incident.title}
+              description={incident.description}
+              onCalloutPress={() => {
+                Alert.alert(
+                  incident.title,
+                  `Type: ${incident.type}\nStatus: ${incident.status}\n\n${incident.description}`,
+                  [
+                    { text: 'Close', style: 'cancel' },
+                    { text: 'View Details', onPress: () => router.push(`/incident/${incident.id}`) }
+                  ]
+                );
+              }}
+            >
+              <View style={[styles.incidentMarker, { backgroundColor: markerStyle.color }]}>
+                {markerStyle.icon}
+              </View>
+            </Marker>
+          );
+        })}
 
         {/* Nearby places markers */}
         {nearbyPlaces.map((place) => (
@@ -323,12 +365,28 @@ const EnhancedMapView = ({
   );
 };
 
+import { router } from 'expo-router';
+
+},
+});
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   map: {
     flex: 1,
+  },
+  incidentMarker: {
+    padding: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   categoryContainer: {
     position: 'absolute',
@@ -359,18 +417,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  incidentMarker: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-  },
+
   placeMarker: {
     width: 24,
     height: 24,
@@ -481,17 +528,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 4
   },
   ratingText: {
     fontSize: 11,
-    color: colors.text,
+    color: colors.text
   },
   priceText: {
     fontSize: 11,
     color: colors.primary,
-    fontWeight: '600',
-  },
+    fontWeight: '600'
+  }
 });
 
 export default EnhancedMapView;

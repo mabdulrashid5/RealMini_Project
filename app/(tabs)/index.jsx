@@ -239,6 +239,23 @@ export default function MapScreen() {
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [selectedIncident, setSelectedIncident] = useState(null);
+  
+  // Handle focusing on new incidents
+  useEffect(() => {
+    const params = router.params;
+    if (params?.focusIncident && params?.lat && params?.lng) {
+      const incident = incidents.find(inc => inc.id === params.focusIncident);
+      if (incident) {
+        setSelectedIncident(incident);
+        mapRef.current?.animateToRegion({
+          latitude: parseFloat(params.lat),
+          longitude: parseFloat(params.lng),
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        }, 1000);
+      }
+    }
+  }, [router.params, incidents]);
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [mapType, setMapType] = useState('standard');
@@ -666,17 +683,56 @@ export default function MapScreen() {
           />
         ))}
 
-        {incidents.map((incident) => (
-          <Marker
-            key={incident.id}
-            coordinate={incident.location}
-            onPress={() => setSelectedIncident(incident)}
-          >
-            <View style={styles.incidentMarker}>
-              <AlertTriangle size={24} color={colors.warning} />
-            </View>
-          </Marker>
-        ))}
+        {incidents.map((incident) => {
+          if (!incident || !incident.id || !incident.coordinate) {
+            console.error('Invalid incident:', incident);
+            return null;
+          }
+          
+          return (
+            <Marker
+              key={incident.id}
+              coordinate={incident.coordinate}
+              onPress={() => setSelectedIncident(incident)}
+            >
+              <View style={styles.incidentMarker}>
+                <AlertTriangle size={24} color={colors.warning} />
+              </View>
+              <Callout onPress={() => {
+                const { user } = useAuthStore.getState();
+                if (!user) {
+                  Alert.alert('Login Required', 'Please login to upvote incidents');
+                  return;
+                }
+                useIncidentsStore.getState().upvoteIncident(incident.id);
+              }}>
+                <View style={styles.calloutContainer}>
+                  <Text style={styles.calloutTitle}>{incident.title}</Text>
+                  <Text style={styles.calloutDescription}>{incident.description}</Text>
+                  <View style={styles.calloutMetadata}>
+                    <Text style={styles.calloutType}>{incident.type}</Text>
+                    {incident.verified && (
+                      <View style={styles.verifiedBadge}>
+                        <Text style={styles.verifiedText}>Verified</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.calloutAddress}>{incident.address}</Text>
+                  <View style={styles.calloutFooter}>
+                    <Text style={styles.calloutTime}>
+                      {new Date(incident.reportedAt).toLocaleString()}
+                    </Text>
+                    <View style={styles.calloutUpvotes}>
+                      <Text style={styles.upvoteCount}>
+                        {incident.upvotes?.length || 0} upvotes
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </Callout>
+            </Marker>
+          );
+        })}
       </MapView>
 
       {!navigationStarted && (
@@ -892,6 +948,72 @@ const styles = StyleSheet.create({
   routeDistance: {
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  calloutContainer: {
+    minWidth: 250,
+    maxWidth: 300,
+    padding: 12,
+  },
+  calloutTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  calloutDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  calloutMetadata: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  calloutType: {
+    fontSize: 12,
+    color: colors.primary,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 8,
+  },
+  verifiedBadge: {
+    backgroundColor: colors.success,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  verifiedText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  calloutAddress: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  calloutFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  calloutTime: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  calloutUpvotes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  upvoteCount: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '500',
     marginLeft: 8,
     minWidth: 40,
   },
@@ -916,6 +1038,26 @@ const styles = StyleSheet.create({
     elevation: 8,
     maxHeight: '60%',
     zIndex: 1000,
+  },
+  calloutContainer: {
+    minWidth: 200,
+    padding: 10,
+  },
+  calloutTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  calloutDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  calloutTime: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
   panelHeader: {
     flexDirection: 'row',

@@ -30,6 +30,7 @@ export default function MyReportsScreen() {
     }
 
     try {
+      console.log('Fetching reports from:', `${API_URL}/api/users/incidents`);
       const response = await fetch(`${API_URL}/api/users/incidents`, {
         method: 'GET',
         headers: {
@@ -39,6 +40,7 @@ export default function MyReportsScreen() {
       });
 
       const data = await response.json();
+      console.log('Reports response:', data);
 
       if (response.ok) {
         // Transform backend data to match frontend format

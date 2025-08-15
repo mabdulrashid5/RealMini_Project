@@ -1,4 +1,4 @@
-# 🚀 RoadAlert Backend - Complete Setup Guide
+# 🚀 RoadWatxh Backend - Complete Setup Guide
 
 ## 🎉 Congratulations! Your backend is ready!
 
@@ -36,16 +36,19 @@ backend/
 ## 🚀 Quick Start (1 minute setup!)
 
 ### 1. Navigate to backend directory:
+
 ```bash
 cd backend
 ```
 
 ### 2. Run the automatic setup script:
+
 ```bash
 ./scripts/start.sh
 ```
 
 **That's it!** The script will:
+
 - ✅ Check all prerequisites
 - ✅ Install dependencies
 - ✅ Set up environment variables
@@ -55,11 +58,13 @@ cd backend
 ## 🔧 Manual Setup (if you prefer)
 
 ### 1. Install dependencies:
+
 ```bash
 npm install
 ```
 
 ### 2. Configure environment:
+
 ```bash
 # Copy the environment template
 cp .env.example .env
@@ -69,16 +74,19 @@ nano .env
 ```
 
 ### 3. Start MongoDB:
+
 ```bash
 mongod
 ```
 
 ### 4. Seed database (optional):
+
 ```bash
 npm run seed
 ```
 
 ### 5. Start server:
+
 ```bash
 # Development
 npm run dev
@@ -92,11 +100,13 @@ npm start
 Your backend provides **50+ endpoints** across 4 main categories:
 
 ### 🔐 Authentication (`/api/auth`)
+
 - Register, login, logout, refresh tokens
 - Profile management, password changes
 - Device token management for push notifications
 
 ### 📍 Incidents (`/api/incidents`)
+
 - Full CRUD operations
 - **Geospatial queries** (find incidents within radius)
 - Upvoting, commenting, verification system
@@ -104,12 +114,14 @@ Your backend provides **50+ endpoints** across 4 main categories:
 - Real-time updates via Socket.IO
 
 ### 👥 Users (`/api/users`)
+
 - Profile management with avatar upload
 - Location updates
 - Statistics and leaderboards
 - Settings management
 
 ### 🚨 Alerts (`/api/alerts`)
+
 - Location-based alert generation
 - Push notification delivery
 - Alert management (read, dismiss)
@@ -117,6 +129,7 @@ Your backend provides **50+ endpoints** across 4 main categories:
 ## 🔌 Real-time Features
 
 **Socket.IO** provides real-time updates for:
+
 - ⚡ New incident alerts
 - 📍 Location-based notifications
 - 💬 Live commenting
@@ -126,6 +139,7 @@ Your backend provides **50+ endpoints** across 4 main categories:
 ## 📱 Push Notifications
 
 **Firebase FCM** integration for:
+
 - 🎯 Location-based incident alerts
 - 🚨 Emergency notifications
 - ✅ Status update notifications
@@ -134,6 +148,7 @@ Your backend provides **50+ endpoints** across 4 main categories:
 ## 🗄️ Database Features
 
 **MongoDB** with advanced features:
+
 - 🌍 **Geospatial indexing** for location queries
 - 📊 **Aggregation pipelines** for statistics
 - 🔍 **Full-text search** capabilities
@@ -142,6 +157,7 @@ Your backend provides **50+ endpoints** across 4 main categories:
 ## 🔒 Security Features
 
 Your backend includes enterprise-grade security:
+
 - 🛡️ **JWT authentication** with refresh tokens
 - 🔐 **Password hashing** with bcrypt (12 rounds)
 - 🚦 **Rate limiting** (100 requests/15min)
@@ -171,11 +187,13 @@ Your backend includes enterprise-grade security:
 ## 🧪 Testing Your Backend
 
 ### 1. Health Check:
+
 ```bash
 curl http://localhost:3000/health
 ```
 
 ### 2. Register a user:
+
 ```bash
 curl -X POST http://localhost:3000/api/auth/register \
   -H "Content-Type: application/json" \
@@ -190,6 +208,7 @@ curl -X POST http://localhost:3000/api/auth/register \
 ```
 
 ### 3. Get nearby incidents:
+
 ```bash
 curl "http://localhost:3000/api/incidents/nearby?latitude=5.6037&longitude=-0.1870&radius=5000"
 ```
@@ -201,32 +220,37 @@ Replace the mock API calls in your React Native app with these endpoints:
 ### Update your store files:
 
 **`store/auth-store.js`** - Replace mock calls with:
+
 ```javascript
-const response = await fetch('http://your-server:3000/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email, password })
+const response = await fetch("http://your-server:3000/api/auth/login", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email, password }),
 });
 ```
 
 **`store/incidents-store.js`** - Replace mock calls with:
+
 ```javascript
-const response = await fetch('http://your-server:3000/api/incidents/nearby?latitude=${lat}&longitude=${lng}&radius=5000');
+const response = await fetch(
+  "http://your-server:3000/api/incidents/nearby?latitude=${lat}&longitude=${lng}&radius=5000"
+);
 ```
 
 ### Add Socket.IO client:
+
 ```bash
 npm install socket.io-client
 ```
 
 ```javascript
-import io from 'socket.io-client';
+import io from "socket.io-client";
 
-const socket = io('http://your-server:3000', {
-  auth: { token: userToken }
+const socket = io("http://your-server:3000", {
+  auth: { token: userToken },
 });
 
-socket.on('new_incident', (incident) => {
+socket.on("new_incident", (incident) => {
   // Handle real-time incident updates
 });
 ```
@@ -234,6 +258,7 @@ socket.on('new_incident', (incident) => {
 ## 🚀 Deployment Options
 
 ### 1. **Heroku** (Easiest):
+
 ```bash
 git add .
 git commit -m "Add backend"
@@ -243,11 +268,13 @@ git push heroku main
 ```
 
 ### 2. **DigitalOcean App Platform**:
+
 - Connect your GitHub repo
 - Set environment variables
 - Deploy with one click
 
 ### 3. **AWS/Google Cloud**:
+
 - Use container deployment
 - Set up load balancer
 - Configure auto-scaling
@@ -255,6 +282,7 @@ git push heroku main
 ## 🔧 Configuration Options
 
 ### Environment Variables:
+
 ```env
 # Required
 MONGODB_URI=mongodb://localhost:27017/roadalert
@@ -285,6 +313,7 @@ REDIS_URL=redis://localhost:6379
 ### Common Issues:
 
 **1. "Cannot connect to MongoDB"**
+
 ```bash
 # Start MongoDB
 mongod
@@ -294,18 +323,21 @@ MONGODB_URI=mongodb://localhost:27017/roadalert
 ```
 
 **2. "JWT secret not set"**
+
 ```bash
 # Add to .env
 JWT_SECRET=your-super-secret-key-here
 ```
 
 **3. "Port already in use"**
+
 ```bash
 # Change port in .env
 PORT=3001
 ```
 
 **4. "Images not uploading"**
+
 - Configure Cloudinary credentials in `.env`
 - Check Cloudinary dashboard for API limits
 
@@ -329,6 +361,7 @@ If you encounter any issues:
 ## 🎉 You're All Set!
 
 Your RoadAlert backend is **production-ready** with:
+
 - ✅ Complete REST API
 - ✅ Real-time WebSocket support
 - ✅ Push notifications

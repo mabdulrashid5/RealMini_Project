@@ -2,18 +2,6 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Mock user for demo purposes
-const mockUser = {
-  id: 'user1',
-  name: 'Abdul Rashid',
-  email: 'abdul@example.com',
-  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
-  role: 'user', // 'user', 'moderator', 'admin'
-  permissions: ['report:create', 'report:read', 'report:update'],
-  createdAt: Date.now(),
-  lastLoginAt: Date.now()
-};
-
 // Validation helpers
 const isValidEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -26,13 +14,27 @@ const isValidPassword = (password) => {
   return passwordRegex.test(password);
 };
 
-const store = (set, get) => ({
+const createAuthStore = (set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: false,
   error: null,
   token: null,
   refreshToken: null,
+
+  // Initialize auth state from storage
+  initializeAuth: async () => {
+    try {
+      const storedToken = await AsyncStorage.getItem('@auth_token');
+      const storedRefreshToken = await AsyncStorage.getItem('@refresh_token');
+      
+      if (storedToken) {
+        set({ token: storedToken, refreshToken: storedRefreshToken, isAuthenticated: true });
+      }
+    } catch (error) {
+      console.error('Failed to load auth state:', error);
+    }
+  },
   
   login: async (email, password) => {
     set({ isLoading: true, error: null });
@@ -88,6 +90,39 @@ const store = (set, get) => ({
         error: error instanceof Error ? error.message : 'Login failed',
         isLoading: false
       });
+    }
+  },
+
+  refreshAuthToken: async () => {
+    try {
+      const currentRefreshToken = get().refreshToken;
+      if (!currentRefreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const response = await fetch(`${require('@/utils/config').API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: currentRefreshToken })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Token refresh failed');
+      }
+
+      const { token, refreshToken } = data.data;
+      
+      await AsyncStorage.setItem('@auth_token', token);
+      await AsyncStorage.setItem('@refresh_token', refreshToken);
+      
+      set({ token, refreshToken });
+      return token;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // Clear auth state on refresh failure
+      get().logout();
+      throw error;
     }
   },
   
@@ -302,24 +337,55 @@ const store = (set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
+      console.log('Starting account deletion process');
       if (!password) {
         throw new Error('Please enter your password to confirm account deletion');
       }
 
-      // Simulate API call to verify password and delete account
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const state = get();
+      console.log('Current auth state:', { isAuthenticated: state.isAuthenticated, hasToken: !!state.token });
+      if (!state.token) {
+        throw new Error('No authentication token available');
+      }
       
-      // Clear all stored data
-      await AsyncStorage.clear();
-      
-      set({ 
-        user: null,
-        isAuthenticated: false,
-        token: null,
-        refreshToken: null,
-        isLoading: false,
-        error: null
+      console.log('Making delete request to backend');
+      const apiUrl = require('@/utils/config').API_URL;
+      console.log('API URL:', apiUrl);
+      // Log the complete URL for debugging
+      const completeUrl = `${apiUrl}/api/auth/account`;
+      console.log('Complete URL:', completeUrl);
+      const response = await fetch(completeUrl, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${state.token}`
+        },
+        body: JSON.stringify({ password })
       });
+
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to delete account');
+      }
+      
+      if (data.success) {
+        // Clear all stored data after successful deletion
+        await AsyncStorage.clear();
+        
+        set({ 
+          user: null,
+          isAuthenticated: false,
+          token: null,
+          refreshToken: null,
+          isLoading: false,
+          error: null
+        });
+        return true;
+      }
+      throw new Error('Failed to delete account');
       
       return true;
     } catch (error) {
@@ -368,7 +434,18 @@ const store = (set, get) => ({
         throw new Error(data.message || 'Password change failed');
       }
       
-      set({ isLoading: false });
+      // Update tokens after password change
+      if (data.data && data.data.token) {
+        await AsyncStorage.setItem('@auth_token', data.data.token);
+        await AsyncStorage.setItem('@refresh_token', data.data.refreshToken);
+        set({ 
+          token: data.data.token, 
+          refreshToken: data.data.refreshToken,
+          isLoading: false 
+        });
+      } else {
+        set({ isLoading: false });
+      }
       return true;
     } catch (error) {
       set({ 
@@ -424,18 +501,18 @@ const store = (set, get) => ({
   }
 });
 
-export const useAuthStore = create()(
-  persist(store, {
-    name: 'auth-storage',
-    storage: createJSONStorage(() => AsyncStorage),
-    partialize: (state) => ({
-      user: state.user,
-      isAuthenticated: state.isAuthenticated,
-      // Don't persist sensitive data
-      token: undefined,
-      refreshToken: undefined,
-      error: undefined,
-      isLoading: undefined,
-    }),
-  })
+export const useAuthStore = create(
+  persist(
+    createAuthStore,
+    {
+      name: 'auth-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+        refreshToken: state.refreshToken,
+        isAuthenticated: state.isAuthenticated
+      })
+    }
+  )
 ); 

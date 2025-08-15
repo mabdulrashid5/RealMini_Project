@@ -24,7 +24,13 @@ export default function ReportScreen() {
   const router = useRouter();
   const { reportIncident, isLoading } = useIncidentsStore();
   
-  const [type, setType] = useState('hazard');
+  // Valid incident types from the backend model
+  const validIncidentTypes = {
+    accident: 'accident',
+    hazard: 'hazard',
+    others: 'violation' // Map 'others' to 'violation' type
+  };
+  const [type, setType] = useState('accident'); // Default to accident
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState(null);
@@ -42,6 +48,7 @@ export default function ReportScreen() {
     setLocationError(null);
     
     try {
+      console.log('Requesting location permissions...');
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setLocationError('Permission to access location was denied');
@@ -49,9 +56,12 @@ export default function ReportScreen() {
         return;
       }
 
+      console.log('Getting current position...');
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High
       });
+
+      console.log('Current position:', currentLocation);
 
       // Get address for the location
       const [address] = await Location.reverseGeocodeAsync({
@@ -59,17 +69,41 @@ export default function ReportScreen() {
         longitude: currentLocation.coords.longitude
       });
 
+      // Format and validate the address
+      const addressParts = address ? 
+        [
+          address.street,
+          address.district,
+          address.city,
+          address.region
+        ].filter(Boolean) : [];
+
+      const formattedAddress = addressParts.length > 0 ? 
+        addressParts.join(', ') : 
+        'Unknown location';
+
+      // Log the location data for debugging
+      console.log('Location data:', {
+        coords: {
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+          accuracy: currentLocation.coords.accuracy
+        },
+        address: formattedAddress,
+        raw: address
+      });
+
+      console.log('Setting location with:', {
+        coords: currentLocation.coords,
+        address: formattedAddress
+      });
+
+      // Store coordinates in the correct format
       setLocation({
         latitude: currentLocation.coords.latitude,
         longitude: currentLocation.coords.longitude,
-        address: address ? 
-          [
-            address.street,
-            address.district,
-            address.city,
-            address.region
-          ].filter(Boolean).join(', ') : 
-          'Unknown location'
+        coords: currentLocation.coords,
+        address: formattedAddress
       });
     } catch (error) {
       setLocationError('Could not get your current location');
@@ -108,13 +142,49 @@ export default function ReportScreen() {
   };
   
   const handleSubmit = async () => {
-    if (!title || !description) {
-      Alert.alert('Missing Information', 'Please fill in all required fields');
+    // Validate all required fields
+    if (!title.trim()) {
+      Alert.alert('Missing Information', 'Please enter a title for the incident');
       return;
     }
 
-    if (!location) {
+    if (title.trim().length > 100) {
+      Alert.alert('Invalid Title', 'Title cannot exceed 100 characters');
+      return;
+    }
+
+    if (!description.trim()) {
+      Alert.alert('Missing Information', 'Please enter a description of the incident');
+      return;
+    }
+
+    if (description.trim().length > 1000) {
+      Alert.alert('Invalid Description', 'Description cannot exceed 1000 characters');
+      return;
+    }
+
+    if (!location || !location.latitude || !location.longitude) {
       Alert.alert('Location Required', 'We need your current location to report an incident. Please enable location services and try again.');
+      return;
+    }
+
+    console.log('Current location:', location); // Debug log
+
+    // Map the selected type to backend type
+    const backendType = validIncidentTypes[type];
+    if (!backendType) {
+      Alert.alert('Invalid Type', 'Please select a valid incident type');
+      return;
+    }
+
+    // Validate minimum lengths
+    if (title.trim().length < 5) {
+      Alert.alert('Invalid Title', 'Title must be at least 5 characters long');
+      return;
+    }
+
+    if (description.trim().length < 10) {
+      Alert.alert('Invalid Description', 'Description must be at least 10 characters long');
       return;
     }
     
@@ -124,6 +194,8 @@ export default function ReportScreen() {
         accuracy: Location.Accuracy.High
       });
 
+      console.log('Verifying location:', { current: currentLocation.coords, saved: location });
+
       // Calculate distance between current and initial location (in meters)
       const distance = getDistanceFromLatLonInMeters(
         currentLocation.coords.latitude,
@@ -131,6 +203,8 @@ export default function ReportScreen() {
         location.latitude,
         location.longitude
       );
+      
+      console.log('Distance from original location:', distance, 'meters');
 
       // If user has moved more than 100 meters from the initial location
       if (distance > 100) {
@@ -151,16 +225,92 @@ export default function ReportScreen() {
         return;
       }
 
-      await reportIncident({
-        type,
-        title,
-        description,
-        location,
-        reportedBy: 'user1',
-        images: image ? [image] : undefined,
-      });
+      // Validate coordinates
+      if (!location || typeof location.longitude !== 'number' || typeof location.latitude !== 'number') {
+        console.error('Invalid location format:', location);
+        Alert.alert('Error', 'Invalid location data. Please try refreshing your location.');
+        return;
+      }
+
+      console.log('Current location data:', location);
+
+      // Get coordinates as numbers
+      const longitude = parseFloat(location.longitude);
+      const latitude = parseFloat(location.latitude);
+
+      // Validate coordinates
+      if (isNaN(longitude) || isNaN(latitude) ||
+          longitude < -180 || longitude > 180 ||
+          latitude < -90 || latitude > 90) {
+        console.error('Invalid coordinates:', { longitude, latitude });
+        Alert.alert('Error', 'Invalid location coordinates. Please try refreshing your location.');
+        return;
+      }
+
+      // Prepare incident data in GeoJSON format
+      const incidentData = {
+        type: backendType,
+        title: title.trim(),
+        description: description.trim(),
+        location: {
+          type: 'Point',
+          coordinates: [longitude, latitude], // GeoJSON uses [longitude, latitude]
+          address: location.address || 'Unknown location'
+        }
+      };
+
+      console.log('Prepared incident data:', JSON.stringify(incidentData, null, 2));
+
+      console.log('Prepared incident data:', JSON.stringify(incidentData, null, 2));
+
+      console.log('Submitting incident data:', incidentData);
       
-      router.back();
+      // Submit the incident
+      let createdIncident;
+      try {
+        createdIncident = await reportIncident(incidentData);
+        console.log('New incident created:', createdIncident);
+      } catch (error) {
+        console.error('Failed to create incident:', error);
+        Alert.alert(
+          'Error',
+          error.message || 'Failed to create incident. Please try again.'
+        );
+        return;
+      }
+
+      if (createdIncident && createdIncident.id) {
+        Alert.alert(
+          'Success',
+          'Report submitted successfully',
+          [{ 
+            text: 'View on Map',
+            onPress: () => {
+              const params = {
+                focusIncident: createdIncident.id,
+                lat: location.latitude,
+                lng: location.longitude
+              };
+              console.log('Navigating with params:', params);
+              router.push({
+                pathname: '/(tabs)/',
+                params
+              });
+            }
+          }]
+        );
+      } else {
+        // If we don't have a valid incident object, show a generic success but log the error
+        console.error('Invalid incident response:', createdIncident);
+        Alert.alert(
+          'Success',
+          'Report submitted successfully',
+          [{ 
+            text: 'OK',
+            onPress: () => router.push('/(tabs)/')
+          }]
+        );
+      }
     } catch (error) {
       console.error('Error reporting incident:', error);
       Alert.alert('Error', 'Failed to report incident. Please try again.');
@@ -168,7 +318,7 @@ export default function ReportScreen() {
   };
   
   const handleCancel = () => {
-    router.back();
+    router.push('/(tabs)');
   };
   
   const getTypeIcon = (incidentType, selected) => {

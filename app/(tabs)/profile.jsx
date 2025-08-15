@@ -11,9 +11,17 @@ import * as ImagePicker from 'expo-image-picker';
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout, updateUser } = useAuthStore();
-  const { getUserStats } = useIncidentsStore();
-  const stats = getUserStats();
+  const { incidents, getUserStats } = useIncidentsStore();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  
+  // Calculate stats whenever incidents change
+  const stats = React.useMemo(() => {
+    console.log('Recalculating user stats. User:', user?.id);
+    console.log('Current incidents count:', incidents?.length);
+    const calculatedStats = getUserStats();
+    console.log('Profile page stats:', calculatedStats);
+    return calculatedStats;
+  }, [incidents, user?.id, getUserStats]);
   const [editedName, setEditedName] = useState(user?.name || 'User');
   const [editedEmail, setEditedEmail] = useState(user?.email || 'user@example.com');
   
